@@ -1,3 +1,4 @@
+from collections import deque
 import queue
 import re
 import threading
@@ -29,6 +30,9 @@ KWS_WINDOW_SEC = 1.5
 KWS_STEP_SEC = 0.4
 KWS_REARM_COOLDOWN_S = 0.5
 assert KWS_STEP_SEC < KWS_WINDOW_SEC
+
+PREBUFFER_SEC = 0.25
+POST_KEYWORD_EXCLUDE_SEC = 0.35
 
 
 def choose_input_device() -> int | None:
@@ -112,12 +116,18 @@ class KeywordVADWhisper:
         self.vad_model, self.vad_iterator = self._init_silero_vad()
 
         self.frame_q: queue.Queue[np.ndarray] = queue.Queue(maxsize=400)
+        self.control_q: queue.Queue[tuple[str, float]] = queue.Queue()
         self.stop_flag = threading.Event()
 
         self._leftover = np.zeros(0, dtype=np.int16)
         self._listening = False  # True after keyword, False after VAD end
         self._in_speech = False
         self._segment_frames: list[np.ndarray] = []
+        self._segment_sample_count = 0
+
+        prebuffer_frames = int(np.ceil(PREBUFFER_SEC * SAMPLE_RATE / FRAME_SAMPLES))
+        self._pre_frames: deque[np.ndarray] = deque(maxlen=max(1, prebuffer_frames))
+        self._ignore_until_sample = 0
 
         self._kws_window_samples = int(KWS_WINDOW_SEC * SAMPLE_RATE)
         self._kws_step_samples = int(KWS_STEP_SEC * SAMPLE_RATE)
@@ -161,6 +171,8 @@ class KeywordVADWhisper:
     def _reset_vad_state(self):
         self._in_speech = False
         self._segment_frames = []
+        self._segment_sample_count = 0
+        self._pre_frames.clear()
         if hasattr(self.vad_iterator, "reset_states"):
             self.vad_iterator.reset_states()
 
@@ -233,6 +245,9 @@ class KeywordVADWhisper:
             if text and KEYWORD_REGEX.search(text):
                 self._listening = True
                 self._reset_vad_state()
+                self._ignore_until_sample = self._total_samples + int(
+                    POST_KEYWORD_EXCLUDE_SEC * SAMPLE_RATE
+                )
                 self._reset_kws_state(cooldown_s=KWS_REARM_COOLDOWN_S)
                 print("keyword detected -> listening=True", flush=True)
                 return True
@@ -254,12 +269,27 @@ class KeywordVADWhisper:
         )
         return (result.get("text") or "").strip()
 
+    def request_listening(self, ignore_seconds: float = 0.0):
+        """
+        Arm listening from outside the audio processing thread.
+        ignore_seconds lets you skip initial audio (useful for TTS bleed).
+        """
+        self.control_q.put(("listen", max(0.0, float(ignore_seconds))))
+
+    def _activate_external_listening(self, ignore_seconds: float):
+        self._listening = True
+        self._reset_vad_state()
+        self._ignore_until_sample = self._total_samples + int(ignore_seconds * SAMPLE_RATE)
+        self._reset_kws_state(cooldown_s=KWS_REARM_COOLDOWN_S)
+        print("external request -> listening=True", flush=True)
+
     def _finalize_segment(self):
         if not self._segment_frames:
             return
 
         segment = np.concatenate(self._segment_frames)
         self._segment_frames = []
+        self._segment_sample_count = 0
 
         duration_s = segment.shape[0] / SAMPLE_RATE
         rms = (
@@ -274,23 +304,44 @@ class KeywordVADWhisper:
 
         text = self._decode_segment(segment)
         if text:
+            text = KEYWORD_REGEX.sub("", text).strip(" ,.")
             print(text, flush=True)
 
-    def _process_listening_frame(self, frame: np.ndarray):
+    def _slice_after_ignore(
+        self, frame: np.ndarray, frame_start_sample: int
+    ) -> np.ndarray:
+        if self._ignore_until_sample <= frame_start_sample:
+            return frame
+
+        cut = self._ignore_until_sample - frame_start_sample
+        if cut >= frame.shape[0]:
+            return np.zeros(0, dtype=np.int16)
+        return frame[cut:]
+
+    def _process_listening_frame(self, frame: np.ndarray, frame_start_sample: int):
         audio_tensor = torch.from_numpy(int16_to_float32(frame))
         vad_event = self.vad_iterator(audio_tensor)
+        eligible_audio = self._slice_after_ignore(frame, frame_start_sample)
 
         if vad_event and "start" in vad_event:
             self._in_speech = True
-            self._segment_frames = [frame]
+            self._segment_frames = list(self._pre_frames)
+            self._segment_sample_count = sum(x.shape[0] for x in self._segment_frames)
+            if eligible_audio.size:
+                self._segment_frames.append(eligible_audio.copy())
+                self._segment_sample_count += int(eligible_audio.shape[0])
             return
 
         if not self._in_speech:
+            if eligible_audio.size:
+                self._pre_frames.append(eligible_audio.copy())
             return
 
-        self._segment_frames.append(frame)
+        if eligible_audio.size:
+            self._segment_frames.append(eligible_audio.copy())
+            self._segment_sample_count += int(eligible_audio.shape[0])
 
-        max_segment_frames = int(MAX_SEGMENT_S * SAMPLE_RATE / FRAME_SAMPLES)
+        max_segment_samples = int(MAX_SEGMENT_S * SAMPLE_RATE)
         if vad_event and "end" in vad_event:
             self._finalize_segment()
             self._reset_vad_state()
@@ -299,7 +350,7 @@ class KeywordVADWhisper:
             print("vad end -> listening=False", flush=True)
             return
 
-        if len(self._segment_frames) >= max_segment_frames:
+        if self._segment_sample_count >= max_segment_samples:
             self._finalize_segment()
             self._reset_vad_state()
             self._listening = False
@@ -311,15 +362,28 @@ class KeywordVADWhisper:
             try:
                 frame = self.frame_q.get(timeout=0.1)
             except queue.Empty:
+                self._drain_control_queue()
                 continue
 
+            self._drain_control_queue()
+            frame_start_sample = self._total_samples
             self._update_kws_buffer(frame)
 
             if not self._listening:
                 self._try_keyword_spot()
                 continue
 
-            self._process_listening_frame(frame)
+            self._process_listening_frame(frame, frame_start_sample)
+
+    def _drain_control_queue(self):
+        while True:
+            try:
+                cmd, arg = self.control_q.get_nowait()
+            except queue.Empty:
+                return
+
+            if cmd == "listen":
+                self._activate_external_listening(arg)
 
     def run(self, device: Optional[int] = None):
         t = threading.Thread(target=self.process_loop, daemon=True)
