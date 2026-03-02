@@ -1,0 +1,361 @@
+[
+  {
+    "actions_executed": [
+      {
+        "entity": {},
+        "handle": null,
+        "op": "unknown",
+        "success": false
+      }
+    ],
+    "applied_rule_hashes": [],
+    "auto_desired_state": {},
+    "considered_rule_hashes": [],
+    "context_signature": {
+      "display_count_bucket": "1",
+      "workspace_mode": "default"
+    },
+    "episode_id": "13dc0b84de434eb8b20fabdcbe8bfdb2",
+    "linked_episode_id": null,
+    "outcome": "failure",
+    "parsed_entities": {},
+    "parsed_intent": "unknown",
+    "target_role": "primary_window",
+    "timestamp": 1772456524.30331,
+    "user_utterance": "reset"
+  },
+  {
+    "actions_executed": [
+      {
+        "entity": "program_x",
+        "handle": "app_inst_1",
+        "op": "open_app",
+        "success": true
+      }
+    ],
+    "applied_rule_hashes": [],
+    "auto_desired_state": {},
+    "considered_rule_hashes": [],
+    "context_signature": {
+      "display_count_bucket": "1",
+      "workspace_mode": "default"
+    },
+    "episode_id": "cb9e2a47b73a40b1afb2b26eeec191a3",
+    "linked_episode_id": null,
+    "outcome": "success",
+    "parsed_entities": {
+      "app": "program_x"
+    },
+    "parsed_intent": "open_app",
+    "target_role": "primary_window",
+    "timestamp": 1772456540.711641,
+    "user_utterance": "open program Program x"
+  },
+  {
+    "actions_executed": [
+      {
+        "op": "set_window_state",
+        "success": true,
+        "ui_object": "win_2",
+        "value": "fullscreen"
+      }
+    ],
+    "applied_rule_hashes": [],
+    "auto_desired_state": {},
+    "considered_rule_hashes": [],
+    "context_signature": {
+      "display_count_bucket": "1",
+      "workspace_mode": "default"
+    },
+    "episode_id": "fe10ea32f9074fccafce8d6b408c745d",
+    "linked_episode_id": "cb9e2a47b73a40b1afb2b26eeec191a3",
+    "outcome": "success",
+    "parsed_entities": {
+      "window_state": "fullscreen"
+    },
+    "parsed_intent": "set_window_state",
+    "target_role": "primary_window",
+    "timestamp": 1772456552.9255412,
+    "user_utterance": "make it fullscreen"
+  },
+  {
+    "actions_executed": [
+      {
+        "entity": "program_y",
+        "handle": "app_inst_3",
+        "op": "open_app",
+        "success": true
+      }
+    ],
+    "applied_rule_hashes": [],
+    "auto_desired_state": {},
+    "considered_rule_hashes": [],
+    "context_signature": {
+      "display_count_bucket": "1",
+      "workspace_mode": "default"
+    },
+    "episode_id": "4b41bb55cef946ae8c985b599c9cff4a",
+    "linked_episode_id": null,
+    "outcome": "success",
+    "parsed_entities": {
+      "app": "program_y"
+    },
+    "parsed_intent": "open_app",
+    "target_role": "primary_window",
+    "timestamp": 1772456571.2733126,
+    "user_utterance": "open program Program Y"
+  },
+  {
+    "actions_executed": [
+      {
+        "op": "set_window_state",
+        "success": true,
+        "ui_object": "win_4",
+        "value": "fullscreen"
+      }
+    ],
+    "applied_rule_hashes": [],
+    "auto_desired_state": {},
+    "considered_rule_hashes": [],
+    "context_signature": {
+      "display_count_bucket": "1",
+      "workspace_mode": "default"
+    },
+    "episode_id": "e689c188d9c14877be5b7c4bc665d9f8",
+    "linked_episode_id": "4b41bb55cef946ae8c985b599c9cff4a",
+    "outcome": "success",
+    "parsed_entities": {
+      "window_state": "fullscreen"
+    },
+    "parsed_intent": "set_window_state",
+    "target_role": "primary_window",
+    "timestamp": 1772456579.3556328,
+    "user_utterance": "make it fullscreen"
+  },
+  {
+    "actions_executed": [
+      {
+        "entity": "programm_z",
+        "handle": "app_inst_5",
+        "op": "open_app",
+        "success": true
+      }
+    ],
+    "applied_rule_hashes": [],
+    "auto_desired_state": {},
+    "considered_rule_hashes": [],
+    "context_signature": {
+      "display_count_bucket": "1",
+      "workspace_mode": "default"
+    },
+    "episode_id": "13d1d725200b4c78ae791d586323f043",
+    "linked_episode_id": null,
+    "outcome": "success",
+    "parsed_entities": {
+      "app": "programm_z"
+    },
+    "parsed_intent": "open_app",
+    "target_role": "primary_window",
+    "timestamp": 1772456591.7855487,
+    "user_utterance": "open program Programm Z"
+  },
+  {
+    "actions_executed": [
+      {
+        "op": "set_window_state",
+        "success": true,
+        "ui_object": "win_6",
+        "value": "fullscreen"
+      }
+    ],
+    "applied_rule_hashes": [],
+    "auto_desired_state": {},
+    "considered_rule_hashes": [],
+    "context_signature": {
+      "display_count_bucket": "1",
+      "workspace_mode": "default"
+    },
+    "episode_id": "0fa7d4fa6d164ab9a4c1ddff8184f6a5",
+    "linked_episode_id": "13d1d725200b4c78ae791d586323f043",
+    "outcome": "success",
+    "parsed_entities": {
+      "window_state": "fullscreen"
+    },
+    "parsed_intent": "set_window_state",
+    "target_role": "primary_window",
+    "timestamp": 1772456613.263697,
+    "user_utterance": "make it fullscreen"
+  },
+  {
+    "actions_executed": [
+      {
+        "entity": "program_a",
+        "handle": "app_inst_7",
+        "op": "open_app",
+        "success": true
+      }
+    ],
+    "applied_rule_hashes": [],
+    "auto_desired_state": {},
+    "considered_rule_hashes": [],
+    "context_signature": {
+      "display_count_bucket": "1",
+      "workspace_mode": "default"
+    },
+    "episode_id": "d10c476ae9b243e884fc82da89640e85",
+    "linked_episode_id": null,
+    "outcome": "success",
+    "parsed_entities": {
+      "app": "program_a"
+    },
+    "parsed_intent": "open_app",
+    "target_role": "primary_window",
+    "timestamp": 1772456629.445285,
+    "user_utterance": "open program Program A"
+  },
+  {
+    "actions_executed": [
+      {
+        "entity": {},
+        "handle": null,
+        "op": "unknown",
+        "success": false
+      }
+    ],
+    "applied_rule_hashes": [],
+    "auto_desired_state": {},
+    "considered_rule_hashes": [],
+    "context_signature": {
+      "display_count_bucket": "1",
+      "workspace_mode": "default"
+    },
+    "episode_id": "77f2d71653e14050a799279bfc1a6216",
+    "linked_episode_id": null,
+    "outcome": "failure",
+    "parsed_entities": {},
+    "parsed_intent": "unknown",
+    "target_role": "primary_window",
+    "timestamp": 1772456660.1434531,
+    "user_utterance": "open programm Program X"
+  },
+  {
+    "actions_executed": [
+      {
+        "op": "set_window_state",
+        "success": true,
+        "ui_object": "win_8",
+        "value": "fullscreen"
+      }
+    ],
+    "applied_rule_hashes": [],
+    "auto_desired_state": {},
+    "considered_rule_hashes": [],
+    "context_signature": {
+      "display_count_bucket": "1",
+      "workspace_mode": "default"
+    },
+    "episode_id": "b39a33b992a242eab1adeec6a201b46c",
+    "linked_episode_id": "d10c476ae9b243e884fc82da89640e85",
+    "outcome": "success",
+    "parsed_entities": {
+      "window_state": "fullscreen"
+    },
+    "parsed_intent": "set_window_state",
+    "target_role": "primary_window",
+    "timestamp": 1772456665.9516835,
+    "user_utterance": "make it fullscreen"
+  },
+  {
+    "actions_executed": [
+      {
+        "entity": "program_x",
+        "handle": "app_inst_9",
+        "op": "open_app",
+        "success": true
+      }
+    ],
+    "applied_rule_hashes": [],
+    "auto_desired_state": {},
+    "considered_rule_hashes": [],
+    "context_signature": {
+      "display_count_bucket": "1",
+      "workspace_mode": "default"
+    },
+    "episode_id": "c0f2bc03eac24b2f87ef93dd14ba48f7",
+    "linked_episode_id": null,
+    "outcome": "success",
+    "parsed_entities": {
+      "app": "program_x"
+    },
+    "parsed_intent": "open_app",
+    "target_role": "primary_window",
+    "timestamp": 1772456698.0528555,
+    "user_utterance": "open program Program X"
+  },
+  {
+    "actions_executed": [
+      {
+        "op": "set_window_state",
+        "success": true,
+        "ui_object": "win_10",
+        "value": "fullscreen"
+      }
+    ],
+    "applied_rule_hashes": [],
+    "auto_desired_state": {},
+    "considered_rule_hashes": [],
+    "context_signature": {
+      "display_count_bucket": "1",
+      "workspace_mode": "default"
+    },
+    "episode_id": "4d6079b77da442248c192a7ec144b9a9",
+    "linked_episode_id": "c0f2bc03eac24b2f87ef93dd14ba48f7",
+    "outcome": "success",
+    "parsed_entities": {
+      "window_state": "fullscreen"
+    },
+    "parsed_intent": "set_window_state",
+    "target_role": "primary_window",
+    "timestamp": 1772456702.515906,
+    "user_utterance": "make it fullscreen"
+  },
+  {
+    "actions_executed": [
+      {
+        "entity": "program_x",
+        "handle": "app_inst_11",
+        "op": "open_app",
+        "success": true
+      },
+      {
+        "op": "set_window_state",
+        "success": true,
+        "ui_object": "win_12",
+        "value": "fullscreen"
+      }
+    ],
+    "applied_rule_hashes": [
+      "7a154d9f6a5222e18c25c9f67c937cdbd4dab9e9eb19a982be9de9b07353f70f"
+    ],
+    "auto_desired_state": {
+      "window_state": "fullscreen"
+    },
+    "considered_rule_hashes": [
+      "7a154d9f6a5222e18c25c9f67c937cdbd4dab9e9eb19a982be9de9b07353f70f"
+    ],
+    "context_signature": {
+      "display_count_bucket": "1",
+      "workspace_mode": "default"
+    },
+    "episode_id": "b1aee78b8efd4e85856fa4346c88d2cd",
+    "linked_episode_id": null,
+    "outcome": "success",
+    "parsed_entities": {
+      "app": "program_x"
+    },
+    "parsed_intent": "open_app",
+    "target_role": "primary_window",
+    "timestamp": 1772456748.7833781,
+    "user_utterance": "open program Program X"
+  }
+]

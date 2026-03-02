@@ -73,6 +73,7 @@ print(runtime.explain_last_action())
 ## Docs
 
 - `memory/docs/HOW_IT_WORKS.md`
+- `memory/docs/CLI_GUIDE.md`
 - `memory/docs/USAGE_IN_PROJECTS.md`
 - `memory/docs/DATA_MODEL.md`
 - `memory/docs/CONTEXT_SCOPES.md`

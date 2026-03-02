@@ -1,0 +1,112 @@
+[
+  {
+    "candidate_id": "7a154d9f6a5222e18c25c9f67c937cdbd4dab9e9eb19a982be9de9b07353f70f",
+    "confidence": 0.6666666666666666,
+    "last_seen": 1772456702.515906,
+    "negative_count": 0,
+    "positive_count": 2,
+    "rule_key": {
+      "context": {
+        "display_count_bucket": "1",
+        "workspace_mode": "default"
+      },
+      "entities": {
+        "app": "program_x"
+      },
+      "intent": "open_app",
+      "role": "primary_window"
+    },
+    "rule_key_hash": "908d63fe7fd78c38d9aa9b9f933dd4bbe896cac40eb6c222e712525cecdc7f31",
+    "rule_value": {
+      "window_state": "fullscreen"
+    },
+    "source_episode_ids": [
+      "cb9e2a47b73a40b1afb2b26eeec191a3",
+      "fe10ea32f9074fccafce8d6b408c745d",
+      "c0f2bc03eac24b2f87ef93dd14ba48f7",
+      "4d6079b77da442248c192a7ec144b9a9"
+    ],
+    "status": "active"
+  },
+  {
+    "candidate_id": "a02f3142a25566d20388ee5d5845456e56a18b9c7e605f002cde8080ff504f8e",
+    "confidence": 0.5,
+    "last_seen": 1772456579.3556328,
+    "negative_count": 0,
+    "positive_count": 1,
+    "rule_key": {
+      "context": {
+        "display_count_bucket": "1",
+        "workspace_mode": "default"
+      },
+      "entities": {
+        "app": "program_y"
+      },
+      "intent": "open_app",
+      "role": "primary_window"
+    },
+    "rule_key_hash": "039fb12a1b72d65dfdb3c3fd4500143d533691ae0c350c01591148a3dad843a2",
+    "rule_value": {
+      "window_state": "fullscreen"
+    },
+    "source_episode_ids": [
+      "4b41bb55cef946ae8c985b599c9cff4a",
+      "e689c188d9c14877be5b7c4bc665d9f8"
+    ],
+    "status": "candidate"
+  },
+  {
+    "candidate_id": "913ba7482839a7082f75d7e31c8a9b83f0b574826c264cea69bf7923fa02af8b",
+    "confidence": 0.5,
+    "last_seen": 1772456613.263697,
+    "negative_count": 0,
+    "positive_count": 1,
+    "rule_key": {
+      "context": {
+        "display_count_bucket": "1",
+        "workspace_mode": "default"
+      },
+      "entities": {
+        "app": "programm_z"
+      },
+      "intent": "open_app",
+      "role": "primary_window"
+    },
+    "rule_key_hash": "e7cc15f06dbe9fe3d77491750f0de02e046b9c022ee43c1ed672ba8b780fae65",
+    "rule_value": {
+      "window_state": "fullscreen"
+    },
+    "source_episode_ids": [
+      "13d1d725200b4c78ae791d586323f043",
+      "0fa7d4fa6d164ab9a4c1ddff8184f6a5"
+    ],
+    "status": "candidate"
+  },
+  {
+    "candidate_id": "3083c45fdf17e247212a53fbf898610a61883fd88b3dfd35a597546ffc31f2bf",
+    "confidence": 0.5,
+    "last_seen": 1772456665.9516835,
+    "negative_count": 0,
+    "positive_count": 1,
+    "rule_key": {
+      "context": {
+        "display_count_bucket": "1",
+        "workspace_mode": "default"
+      },
+      "entities": {
+        "app": "program_a"
+      },
+      "intent": "open_app",
+      "role": "primary_window"
+    },
+    "rule_key_hash": "e11b3770fee25b697b8dfbd26f3ba8d93b96c59df610b10fa67ef25b1a7503a2",
+    "rule_value": {
+      "window_state": "fullscreen"
+    },
+    "source_episode_ids": [
+      "d10c476ae9b243e884fc82da89640e85",
+      "b39a33b992a242eab1adeec6a201b46c"
+    ],
+    "status": "candidate"
+  }
+]
