@@ -6,9 +6,11 @@
 2026-02-25 08:39:13 git clone https://github.com/nazdridoy/kokoro-tts
 
 import re
+import uuid
 import queue
 import threading
 import time
+
 import numpy as np
 import sounddevice as sd
 
@@ -48,6 +50,34 @@ def chunk_text(text: str, max_chars: int = 80):
             for i in range(0, len(c), max_chars):
                 final.append(c[i : i + max_chars])
     return final
+
+
+def parse_tagged_message(payload: str) -> tuple[str, str]:
+    """
+    Expected format: [uuidv4]text message
+    Returns: (uuid, text)
+    """
+    if not payload.startswith("["):
+        raise ValueError("Message must start with '[uuidv4]'")
+
+    close = payload.find("]")
+    if close <= 1:
+        raise ValueError("Message must include a closing ']' after uuidv4")
+
+    message_id = payload[1:close].strip()
+    try:
+        parsed_uuid = uuid.UUID(message_id)
+    except ValueError as exc:
+        raise ValueError(f"Invalid UUID: {message_id}") from exc
+
+    if parsed_uuid.version != 4:
+        raise ValueError(f"UUID is not v4: {message_id}")
+
+    text = payload[close + 1 :].strip()
+    if not text:
+        raise ValueError("Message text is empty")
+
+    return message_id, text
 
 
 def benchmark_tts_generation(player, text: str, runs: int = 5):
@@ -118,12 +148,17 @@ class KokoroPlayer:
         self._stream_lock = threading.Lock()
 
         self._audio_queue: queue.Queue[object] = queue.Queue()
-        self._requests: queue.Queue[tuple[str, threading.Event | None]] = queue.Queue()
+        self._requests: queue.Queue[tuple[str | None, str, threading.Event | None]] = queue.Queue()
+        self._finished_ids: queue.Queue[str] = queue.Queue()
+
         self._pending_buf = np.array([], dtype=np.float32)
         self._pending_offset = 0
 
         self._worker = threading.Thread(target=self._tts_worker, daemon=True)
         self._worker.start()
+
+        self._finished_worker = threading.Thread(target=self._finished_notifier, daemon=True)
+        self._finished_worker.start()
 
     def _ensure_stream(self, samplerate: int):
         with self._stream_lock:
@@ -172,9 +207,12 @@ class KokoroPlayer:
                 break
 
             if isinstance(item, tuple) and item and item[0] == "done":
-                done_event = item[1]
+                message_id = item[1]
+                done_event = item[2]
                 if done_event is not None:
                     done_event.set()
+                if message_id is not None:
+                    self._finished_ids.put(message_id)
                 continue
 
             self._pending_buf = item
@@ -182,13 +220,27 @@ class KokoroPlayer:
 
         outdata[:, 0] = out
 
+    def _finished_notifier(self):
+        while True:
+            message_id = self._finished_ids.get()
+            try:
+                self.finished(message_id)
+            except Exception as exc:
+                print(f"finished callback failed for id={message_id}: {exc}")
+
+    def finished(self, message_id: str):
+        print(f"finished({message_id})")
+
     def _tts_worker(self):
         while True:
-            text, done_event = self._requests.get()
+            message_id, text, done_event = self._requests.get()
             try:
                 chunks = chunk_text(text, max_chars=self.max_chars)
                 if not chunks:
-                    done_event.set()
+                    if done_event is not None:
+                        done_event.set()
+                    if message_id is not None:
+                        self._finished_ids.put(message_id)
                     continue
 
                 first_samples, sr = self.kokoro.create(
@@ -214,35 +266,47 @@ class KokoroPlayer:
                     self._audio_queue.put(np.asarray(samples, dtype=np.float32))
             finally:
                 # Mark completion after all audio for this request has been queued.
-                self._audio_queue.put(("done", done_event))
+                self._audio_queue.put(("done", message_id, done_event))
 
     def enqueue_text(self, text: str):
-        self._requests.put((text, None))
+        self._requests.put((None, text, None))
+
+    def enqueue_message(self, message_id: str, text: str):
+        self._requests.put((message_id, text, None))
 
     def play_text(self, text: str):
         done_event = threading.Event()
-        self._requests.put((text, done_event))
+        self._requests.put((None, text, done_event))
         done_event.wait()
 
 
 def make_tts_callback(player: KokoroPlayer):
-    def on_text_message(text: str):
+    def on_text_message(payload: str):
         # Non-blocking: queue for playback and return immediately to the receiver.
-        player.enqueue_text(text)
+        try:
+            message_id, text = parse_tagged_message(payload)
+        except ValueError as exc:
+            print(f"Invalid payload: {exc}")
+            return
+
+        player.enqueue_message(message_id, text)
 
     return on_text_message
 
 
 def demo_text_message_receiver(on_text_message):
+    id1 = "9ce5f70e-b217-4f6f-b991-b98ca8f9a591"
+    id2 = "fd179379-e87e-4e9b-9961-38146a560f39"
+    id3 = "26cf9f6f-c85f-4975-9ca5-53dc59cafa3b"
+
     text1 = "This is the first demo sentence. It plays through the shared function."
     text2 = "This is the second text block. You can replace it with anything from your app."
     text3 = "This is the third example. Each string calls the same playback function."
 
     print("START")
-    on_text_message(text1)
-    # on_text_message(text2)
-    # on_text_message(text3)
-
+    on_text_message(f"[{id1}]{text1}")
+    on_text_message(f"[{id2}]{text2}")
+    on_text_message(f"[{id3}]{text3}")
 
 def main():
     model_path = "kokoro-v1.0.onnx"
@@ -263,7 +327,8 @@ def main():
     demo_text_message_receiver(on_text_message)
 
     # Stand-in for a real receiver loop (socket server, etc.).
-    # Ctrl+C exits the process and stops the daemon worker thread.
+    # Replace with your blocking receiver: serve(on_text_message)
+    # Ctrl+C exits the process and stops the daemon worker threads.
     while True:
         sd.sleep(250)
 
