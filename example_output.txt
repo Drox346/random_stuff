@@ -1,0 +1,10 @@
+The system includes a emory module that tracks patterns in the users corrections.
+Use these learned preferences only when they directly apply to the current action.
+Do not generalize beyond the specific cases listed. 
+
+Current learned user preferences:
+- The user consistently changes the 'navigation' to fullscreen when it opens
+- The user never wants speed_history to open in fullscreen
+- The user consistently changes speed_history to open as a widget
+
+When responing or choosing defaults, prefer these behaviour unless the user explicitly requests something different.

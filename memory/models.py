@@ -4,12 +4,21 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, Literal, TypeAlias
 
 from .constants import CONTEXT_WHITELIST, DEFAULT_WORKSPACE_MODE
 
 RuleStatus = Literal["candidate", "active", "blocked"]
+EpisodeType = Literal["attempt", "correction"]
+ScalarValue: TypeAlias = str | bool | int | float
+
+
+def _normalize_scalar(value: ScalarValue) -> ScalarValue:
+    if isinstance(value, str):
+        return normalize_identifier(value)
+    return value
 
 
 def normalize_identifier(value: str) -> str:
@@ -35,6 +44,16 @@ def canonicalize_entities(entities: dict[str, str] | None) -> dict[str, str]:
     return dict(sorted(normalized.items(), key=lambda item: item[0]))
 
 
+def canonicalize_action(action: dict[str, ScalarValue] | None) -> dict[str, ScalarValue]:
+    action = action or {}
+    normalized = {
+        normalize_identifier(str(key)): _normalize_scalar(value)
+        for key, value in action.items()
+        if key is not None and value is not None
+    }
+    return dict(sorted(normalized.items(), key=lambda item: item[0]))
+
+
 def canonicalize_context(context: dict[str, str | int] | None) -> dict[str, str | int]:
     context = context or {}
     canonical: dict[str, str | int] = {}
@@ -56,39 +75,94 @@ def canonical_json(data: dict[str, Any]) -> str:
 
 
 @dataclass(slots=True)
-class SemanticParse:
+class PlannedAction:
     intent: str
     entities: dict[str, str]
-    role: str
+    action: dict[str, ScalarValue]
     context: dict[str, str | int]
-    raw_utterance: str
+    timestamp: float
+    role: str | None = None
+
+    def __post_init__(self) -> None:
+        self.intent = normalize_identifier(self.intent)
+        self.entities = canonicalize_entities(self.entities)
+        self.action = canonicalize_action(self.action)
+        self.context = canonicalize_context(self.context)
+        if self.role:
+            self.role = normalize_identifier(self.role)
+
+    def canonical_dict(self) -> dict[str, Any]:
+        payload = {
+            "intent": normalize_identifier(self.intent),
+            "entities": canonicalize_entities(self.entities),
+            "action": canonicalize_action(self.action),
+            "context": canonicalize_context(self.context),
+            "timestamp": float(self.timestamp),
+        }
+        if self.role:
+            payload["role"] = normalize_identifier(self.role)
+        return payload
+
+    def to_dict(self) -> dict[str, Any]:
+        return self.canonical_dict()
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "PlannedAction":
+        return cls(
+            intent=str(data["intent"]),
+            entities=dict(data.get("entities", {})),
+            action=dict(data.get("action", {})),
+            context=dict(data.get("context", {})),
+            timestamp=float(data.get("timestamp", time.time())),
+            role=data.get("role"),
+        )
+
+
+@dataclass(slots=True)
+class CorrectionRecord:
+    original: PlannedAction
+    corrected: PlannedAction
     timestamp: float
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "intent": self.intent,
-            "entities": dict(self.entities),
-            "role": self.role,
-            "context": dict(self.context),
-            "raw_utterance": self.raw_utterance,
+            "original": self.original.to_dict(),
+            "corrected": self.corrected.to_dict(),
             "timestamp": self.timestamp,
         }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "CorrectionRecord":
+        return cls(
+            original=PlannedAction.from_dict(dict(data["original"])),
+            corrected=PlannedAction.from_dict(dict(data["corrected"])),
+            timestamp=float(data["timestamp"]),
+        )
 
 
 @dataclass(slots=True)
 class RuleKey:
     intent: str
     entities: dict[str, str]
-    role: str
+    role: str | None
     context: dict[str, str | int]
 
+    def __post_init__(self) -> None:
+        self.intent = normalize_identifier(self.intent)
+        self.entities = canonicalize_entities(self.entities)
+        self.context = canonicalize_context(self.context)
+        if self.role:
+            self.role = normalize_identifier(self.role)
+
     def canonical_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "intent": normalize_identifier(self.intent),
             "entities": canonicalize_entities(self.entities),
-            "role": normalize_identifier(self.role),
             "context": canonicalize_context(self.context),
         }
+        if self.role:
+            payload["role"] = normalize_identifier(self.role)
+        return payload
 
     def hash(self) -> str:
         payload = canonical_json(self.canonical_dict()).encode("utf-8")
@@ -99,50 +173,28 @@ class RuleKey:
         return cls(
             intent=str(data["intent"]),
             entities=dict(data.get("entities", {})),
-            role=str(data["role"]),
+            role=data.get("role"),
             context=dict(data.get("context", {})),
         )
 
 
 @dataclass(slots=True)
 class RuleValue:
-    window_state: str | None = None
-    always_on_top: bool | None = None
-    display: str | None = None
-    size_preset: str | None = None
-    dock_region: str | None = None
-    visibility: str | None = None
+    preferences: dict[str, ScalarValue] = field(default_factory=dict)
 
-    def to_desired_state(self) -> dict[str, Any]:
-        desired: dict[str, Any] = {}
-        if self.window_state is not None:
-            desired["window_state"] = self.window_state
-        if self.always_on_top is not None:
-            desired["always_on_top"] = self.always_on_top
-        if self.display is not None:
-            desired["display"] = self.display
-        if self.size_preset is not None:
-            desired["size_preset"] = self.size_preset
-        if self.dock_region is not None:
-            desired["dock_region"] = self.dock_region
-        if self.visibility is not None:
-            desired["visibility"] = self.visibility
-        return desired
+    def __post_init__(self) -> None:
+        self.preferences = canonicalize_action(self.preferences)
+
+    def to_preferences(self) -> dict[str, ScalarValue]:
+        return canonicalize_action(self.preferences)
 
     @classmethod
-    def from_desired_state(cls, data: dict[str, Any]) -> "RuleValue":
-        return cls(
-            window_state=data.get("window_state"),
-            always_on_top=data.get("always_on_top"),
-            display=data.get("display"),
-            size_preset=data.get("size_preset"),
-            dock_region=data.get("dock_region"),
-            visibility=data.get("visibility"),
-        )
+    def from_preferences(cls, data: dict[str, Any]) -> "RuleValue":
+        return cls(preferences=canonicalize_action(data))
 
 
 def compute_candidate_id(rule_key_hash: str, rule_value: RuleValue) -> str:
-    payload = f"{rule_key_hash}:{canonical_json(rule_value.to_desired_state())}".encode("utf-8")
+    payload = f"{rule_key_hash}:{canonical_json(rule_value.to_preferences())}".encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
 
 
@@ -164,7 +216,7 @@ class PreferenceCandidate:
             "candidate_id": self.candidate_id,
             "rule_key_hash": self.rule_key_hash,
             "rule_key": self.rule_key.canonical_dict(),
-            "rule_value": self.rule_value.to_desired_state(),
+            "rule_value": self.rule_value.to_preferences(),
             "positive_count": self.positive_count,
             "negative_count": self.negative_count,
             "last_seen": self.last_seen,
@@ -179,7 +231,7 @@ class PreferenceCandidate:
             candidate_id=str(data["candidate_id"]),
             rule_key_hash=str(data["rule_key_hash"]),
             rule_key=RuleKey.from_dict(dict(data["rule_key"])),
-            rule_value=RuleValue.from_desired_state(dict(data["rule_value"])),
+            rule_value=RuleValue.from_preferences(dict(data["rule_value"])),
             positive_count=int(data.get("positive_count", 0)),
             negative_count=int(data.get("negative_count", 0)),
             last_seen=float(data.get("last_seen", 0.0)),
@@ -192,64 +244,55 @@ class PreferenceCandidate:
 @dataclass(slots=True)
 class Episode:
     episode_id: str
+    episode_type: EpisodeType
     timestamp: float
-    user_utterance: str
-    parsed_intent: str
-    parsed_entities: dict[str, str]
-    target_role: str
-    context_signature: dict[str, str | int]
-    actions_executed: list[dict[str, Any]]
+    planned_action: dict[str, Any] | None
+    original_action: dict[str, Any] | None
+    corrected_action: dict[str, Any] | None
     outcome: str
     linked_episode_id: str | None = None
-    considered_rule_hashes: list[str] = field(default_factory=list)
-    applied_rule_hashes: list[str] = field(default_factory=list)
-    auto_desired_state: dict[str, Any] = field(default_factory=dict)
+    matched_rule_hashes: list[str] = field(default_factory=list)
+    snippet_text: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "episode_id": self.episode_id,
+            "episode_type": self.episode_type,
             "timestamp": self.timestamp,
-            "user_utterance": self.user_utterance,
-            "parsed_intent": self.parsed_intent,
-            "parsed_entities": dict(self.parsed_entities),
-            "target_role": self.target_role,
-            "context_signature": dict(self.context_signature),
-            "actions_executed": list(self.actions_executed),
+            "planned_action": self.planned_action,
+            "original_action": self.original_action,
+            "corrected_action": self.corrected_action,
             "outcome": self.outcome,
             "linked_episode_id": self.linked_episode_id,
-            "considered_rule_hashes": list(self.considered_rule_hashes),
-            "applied_rule_hashes": list(self.applied_rule_hashes),
-            "auto_desired_state": dict(self.auto_desired_state),
+            "matched_rule_hashes": list(self.matched_rule_hashes),
+            "snippet_text": self.snippet_text,
         }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Episode":
         return cls(
             episode_id=str(data["episode_id"]),
+            episode_type=data["episode_type"],
             timestamp=float(data["timestamp"]),
-            user_utterance=str(data["user_utterance"]),
-            parsed_intent=str(data["parsed_intent"]),
-            parsed_entities=dict(data.get("parsed_entities", {})),
-            target_role=str(data["target_role"]),
-            context_signature=dict(data.get("context_signature", {})),
-            actions_executed=list(data.get("actions_executed", [])),
+            planned_action=data.get("planned_action"),
+            original_action=data.get("original_action"),
+            corrected_action=data.get("corrected_action"),
             outcome=str(data.get("outcome", "unknown")),
             linked_episode_id=data.get("linked_episode_id"),
-            considered_rule_hashes=list(data.get("considered_rule_hashes", [])),
-            applied_rule_hashes=list(data.get("applied_rule_hashes", [])),
-            auto_desired_state=dict(data.get("auto_desired_state", {})),
+            matched_rule_hashes=list(data.get("matched_rule_hashes", [])),
+            snippet_text=str(data.get("snippet_text", "")),
         )
 
 
 @dataclass(slots=True)
-class PolicyDecision:
-    desired_state: dict[str, Any]
-    considered_rule_hashes: list[str]
-    applied_rule_hashes: list[str]
+class MatchExplanation:
+    snippet_text: str
+    matched_rule_hashes: list[str]
+    matched_rules: list[dict[str, Any]]
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "desired_state": dict(self.desired_state),
-            "considered_rule_hashes": list(self.considered_rule_hashes),
-            "applied_rule_hashes": list(self.applied_rule_hashes),
+            "snippet_text": self.snippet_text,
+            "matched_rule_hashes": list(self.matched_rule_hashes),
+            "matched_rules": list(self.matched_rules),
         }

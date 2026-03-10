@@ -1,5 +1,5 @@
-"""Preference memory demo package."""
+"""Structured preference memory package."""
 
-from .runtime import PreferenceMemoryRuntime
+from .service import PreferenceMemoryService
 
-__all__ = ["PreferenceMemoryRuntime"]
+__all__ = ["PreferenceMemoryService"]

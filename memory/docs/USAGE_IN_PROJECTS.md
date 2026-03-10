@@ -3,116 +3,297 @@
 ## Minimal integration
 
 ```python
-from memory.runtime import PreferenceMemoryRuntime
+from memory.service import PreferenceMemoryService
 
-runtime = PreferenceMemoryRuntime(
-    data_dir="./my_memory_data",
-)
+service = PreferenceMemoryService(data_dir="./my_memory_data")
 
-result = runtime.process_utterance(
-    "open program blender",
-    runtime_context={"display_count": 1, "workspace_mode": "editing"},
-)
+planned_action = {
+    "intent": "open_widget",
+    "entities": {"widget_id": "navigation", "widget_group": "small_graph"},
+    "action": {"window_state": "normal"},
+    "context": {"display_count": 1, "workspace_mode": "default"},
+    "role": "widget",
+    "timestamp": 1000.0,
+}
 
-print(result["outcome"])
-print(result["policy"])
+snippet = service.build_prompt_snippet()
+service.record_attempt(planned_action)
+print(snippet)
 ```
 
-## Interactive CLI for real-time testing
+## Exact service contract
 
-Run:
+### `record_attempt(planned_action)`
 
-```bash
-python -m memory.cli --fresh
+Accepted input:
+
+- `PlannedAction`
+- `dict` matching `PlannedAction`
+
+Required fields:
+
+- `intent`
+- `entities`
+- `action`
+- `context`
+- `timestamp`
+
+Optional field:
+
+- `role`
+
+Return shape:
+
+```json
+{
+  "episode_id": "abc123...",
+  "matched_rule_hashes": ["..."],
+  "snippet_text": "..."
+}
 ```
 
-Useful options:
+Behavior:
 
-- `--data-dir ./state_dir`: keep memory state in a custom directory
-- `--time-mode real`: use wall-clock timestamps
-- `--time-mode virtual --time-start 1000 --time-step 5`: deterministic simulated time
-- `--display-count 2 --workspace-mode editing`: set initial context
+- stores an `attempt` episode
+- records which active rules match the attempt
+- does not create positive evidence by itself
 
-Core CLI commands:
+### `record_correction(correction_record)`
 
-- `:context show`
-- `:context display_count=2 workspace_mode=editing`
-- `:rules active` (or `candidate`, `blocked`, `all`)
-- `:episodes 20`
-- `:explain`
-- `:inspect <ui_object>`
-- `:time mode real|virtual`
-- `:time step 10`
-- `:reset`
+Accepted input:
 
-Any non-command line is treated as a user utterance and sent to `process_utterance(...)`.
+- `CorrectionRecord`
+- `dict` matching `CorrectionRecord`
 
-## Replace mocked components
+Return shape:
 
-`PreferenceMemoryRuntime` accepts dependency injection for all major parts:
+```json
+{
+  "episode_id": "abc123...",
+  "linked_episode_id": "prior_attempt_id_or_null",
+  "learning_updates": {
+    "updated_candidates": ["..."],
+    "negative_updates": ["..."]
+  }
+}
+```
 
-- `store`: use `MemoryStore` or custom persistence
-- `resolver`: replace with your parser/intent model
-- `learner`: customize learning policy
-- `policy_engine`: customize match/rank behavior
-- `adapter`: connect to your real UI runtime
-- `event_logger`: send traces to your observability stack
+Behavior:
 
-## Custom UI adapter contract
+- stores a `correction` episode
+- compares `original.action` and `corrected.action`
+- creates or reinforces one preference candidate per changed action key
+- adds negative evidence to conflicting active candidates on the same action key
 
-Implement `UICapabilityAdapter` from `memory/ui_adapter.py`:
+### `build_prompt_snippet()`
 
-- `open_app(app_id) -> str`
-- `open_document(doc_ref) -> str`
-- `show_panel(panel_id) -> str`
-- `resolve(role, entity, handle=None) -> str | None`
-- `set_window_state(ui_object, state) -> bool`
-- `move_to_display(ui_object, display_id) -> bool`
-- `resize_preset(ui_object, preset) -> bool`
-- `dock(ui_object, region) -> bool`
-- `get_capabilities(ui_object) -> set[str]`
+Arguments:
 
-Optional runtime methods supported via duck typing:
+- none
 
-- `set_visibility(ui_object, visibility)`
-- `set_always_on_top(ui_object, enabled)`
+Return:
 
-## Production-oriented tips
+- `str`
 
-- Keep resolver entity normalization stable across versions.
-- Keep context dimensions low-cardinality to avoid overfitting.
-- Use adapter capability checks to avoid false failures.
-- Run periodic audits on blocked/active candidates.
-- Consider schema versioning if persisting long-term data.
+Behavior:
 
-## Example: custom runtime assembly
+- renders one prompt block from all active learned rules
+- orders rules by context specificity, entity specificity, confidence, and recency
+- omits rules below the wording threshold
+
+### `explain_last_match()`
+
+Return:
+
+- dict containing the rendered snippet and matched rule metadata
+
+## Correction recording
+
+When the user corrects the original LLM plan, send both plans:
 
 ```python
-from memory.runtime import PreferenceMemoryRuntime
-from memory.memory_store import MemoryStore
-from memory.policy_engine import PolicyEngine
-from memory.preference_learner import PreferenceLearner
-from memory.semantic_resolver import SemanticResolver
-from my_project.real_ui_adapter import RealAdapter
-
-store = MemoryStore(data_dir="./memory_state")
-resolver = SemanticResolver()  # or your own
-learner = PreferenceLearner(store)
-policy = PolicyEngine(store)
-adapter = RealAdapter()
-
-runtime = PreferenceMemoryRuntime(
-    store=store,
-    resolver=resolver,
-    learner=learner,
-    policy_engine=policy,
-    adapter=adapter,
-)
+correction = {
+    "original": planned_action,
+    "corrected": {
+        **planned_action,
+        "action": {"window_state": "fullscreen"},
+        "timestamp": 1010.0,
+    },
+    "timestamp": 1010.0,
+}
+service.record_correction(correction)
 ```
 
-## Operational flow in app code
+## End-to-end example with full input and generated prompt
 
-1. Build `runtime_context` from environment state (display count, workspace mode).
-2. Call `process_utterance(...)` for every user request.
-3. Log `result["actions"]` and `result["policy"]` for diagnostics.
-4. Use `explain_last_action()` for user-facing debug command.
+This example shows:
+
+- the exact structured payload your app sends into memory
+- the correction records that teach memory a rule
+- the prompt snippet that comes back out from all active learned rules
+
+```python
+from memory.service import PreferenceMemoryService
+
+service = PreferenceMemoryService(data_dir="./my_memory_data")
+service.reset()
+
+# First plan proposed by the LLM or tool layer.
+first_attempt = {
+    "intent": "open_widget",
+    "entities": {
+        "widget_id": "navigation",
+        "widget_group": "small_graph",
+    },
+    "action": {
+        "window_state": "normal",
+    },
+    "context": {
+        "display_count": 1,
+        "workspace_mode": "default",
+    },
+    "role": "widget",
+    "timestamp": 1000.0,
+}
+
+service.record_attempt(first_attempt)
+
+# The user corrects that plan to fullscreen.
+service.record_correction(
+    {
+        "original": first_attempt,
+        "corrected": {
+            **first_attempt,
+            "action": {"window_state": "fullscreen"},
+            "timestamp": 1010.0,
+        },
+        "timestamp": 1010.0,
+    }
+)
+
+# A second matching correction promotes the learned preference to active.
+second_attempt = {
+    **first_attempt,
+    "timestamp": 1020.0,
+}
+service.record_attempt(second_attempt)
+service.record_correction(
+    {
+        "original": second_attempt,
+        "corrected": {
+            **second_attempt,
+            "action": {"window_state": "fullscreen"},
+            "timestamp": 1030.0,
+        },
+        "timestamp": 1030.0,
+    }
+)
+
+# The prompt is generated from all active learned rules.
+prompt_snippet = service.build_prompt_snippet()
+
+print("PROMPT SNIPPET:")
+print(prompt_snippet)
+```
+
+Generated prompt snippet from the learned rules:
+
+```text
+The system includes a memory module that tracks patterns in the user's corrections.
+Use these learned preferences only when they directly apply to the current action.
+Do not generalize beyond the specific cases listed.
+
+Current learned user preferences:
+- The user usually changes 'navigation' to open in fullscreen.
+
+When responding or choosing defaults, prefer these behaviors unless the user explicitly requests something different.
+```
+
+The important point is that memory does not return a UI action. It returns prompt text derived from all active learned rules.
+
+## Normalization and action capabilities
+
+String normalization:
+
+- lowercases strings
+- trims whitespace
+- converts spaces to underscores
+
+Examples:
+
+- `Top Right` -> `top_right`
+- `Editing Session` -> `editing_session`
+- `Speed History` -> `speed_history`
+
+Context normalization:
+
+- `display_count=1` -> `display_count_bucket="1"`
+- `display_count=2` -> `display_count_bucket="2"`
+- `display_count>=3` -> `display_count_bucket="3+"`
+- `workspace_mode` is normalized
+
+Action payload capabilities:
+
+- keys are generic and not hardcoded to a fixed schema
+- values may be `str`, `bool`, `int`, or `float`
+- examples:
+
+```json
+{"window_state": "fullscreen"}
+```
+
+```json
+{"presentation": "widget"}
+```
+
+```json
+{"placement": "top_right", "always_on_top": true}
+```
+
+Learning behavior:
+
+- only changed keys between `original.action` and `corrected.action` contribute evidence
+- if two keys change, two separate preference updates are created
+
+Example:
+
+```json
+{
+  "original": {"action": {"placement": "center", "window_state": "normal"}},
+  "corrected": {"action": {"placement": "top_right", "window_state": "fullscreen"}}
+}
+```
+
+This produces:
+
+- `placement=top_right`
+- `window_state=fullscreen`
+
+Prompt wording bands:
+
+- `strong`: confidence `>= 0.90` and support `>= 5` -> `always`
+- `consistent`: confidence `>= 0.75` and support `>= 3` -> `consistently`
+- `usual`: confidence `>= 0.60` and support `>= 2` -> `usually`
+
+Confidence formula:
+
+- `positive_count / (positive_count + negative_count + 1)`
+
+## Integration pattern with tool-calling
+
+1. Build the next `PlannedAction` candidate from your LLM or tool schema.
+2. Call `build_prompt_snippet()` and inject the returned text into the system prompt for the next LLM call.
+3. Once the LLM commits to a plan, call `record_attempt(planned_action)`.
+4. If the user corrects the action, emit a structured `CorrectionRecord` and call `record_correction(...)`.
+5. Use `explain_last_match()` for debugging or trace views.
+
+## Service dependencies
+
+`PreferenceMemoryService` composes:
+
+- `MemoryStore`
+- `PreferenceLearner`
+- `PolicyEngine`
+- `PromptSnippetBuilder`
+
+You can swap any of these if you need custom persistence, ranking, or prompt rendering.

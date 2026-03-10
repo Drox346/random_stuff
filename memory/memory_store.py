@@ -86,11 +86,11 @@ class MemoryStore:
         return None
 
     def find_candidate(self, rule_key_hash: str, rule_value: RuleValue) -> PreferenceCandidate | None:
-        desired_state = rule_value.to_desired_state()
+        desired_state = rule_value.to_preferences()
         for candidate in self.list_candidates():
             if candidate.rule_key_hash != rule_key_hash:
                 continue
-            if candidate.rule_value.to_desired_state() == desired_state:
+            if candidate.rule_value.to_preferences() == desired_state:
                 return candidate
         return None
 

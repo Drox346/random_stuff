@@ -1,80 +1,58 @@
-# How It Works (Detailed)
+# How It Works
 
-## End-to-end pipeline
+## End-to-end flow
 
-For each utterance, `PreferenceMemoryRuntime.process_utterance(...)` runs:
+The service operates on structured LLM outputs, not raw text:
 
-1. Parse utterance with `SemanticResolver` into:
-   - intent
-   - entities
-   - role
-   - context signature
-2. Classify intent as base request or correction.
-3. Base request path:
-   - execute base action (`open_app`, `open_document`, `show_panel`, etc.)
-   - resolve semantic role to current UI object via adapter
-   - run `PolicyEngine.decide(...)` to get desired end-state
-   - apply desired end-state ops through adapter
-4. Correction path:
-   - find most recent compatible base episode in correction window
-   - apply correction immediately to target object
-   - update learner evidence and candidate status
-5. Persist an `Episode` record and update explainability trace.
+1. Upstream LLM or tool-calling code produces a `PlannedAction`.
+2. The app may call `build_prompt_snippet()` before the next LLM decision.
+3. The app records the chosen plan with `record_attempt(planned_action)`.
+4. If the user corrects the result, upstream code produces a `CorrectionRecord` with:
+   - the original planned action
+   - the corrected planned action
+5. `record_correction(...)` diffs the action payloads and updates preference candidates.
 
-## Why semantics instead of widget IDs
+## Rule model
 
-Dynamic UIs recreate windows/panels frequently. This system stores rules over semantic targets:
+Rules are keyed by:
 
-- Intent: what user is doing (`open_app`, `show_panel`, ...)
-- Entities: normalized identifiers (`app=program_x`, `panel=inspector`)
-- Role: semantic target (`primary_window`, `panel`)
-- Context: stable environment bucket (`display_count_bucket`, `workspace_mode`)
+- `intent`
+- normalized `entities`
+- optional `role`
+- whitelisted `context`
 
-At runtime, adapter `resolve(role, entity, handle)` maps semantics to the current ephemeral UI object.
+Rules store a preferred action patch such as:
 
-## Learning loop
+- `{"window_state": "fullscreen"}`
+- `{"presentation": "widget"}`
+- `{"placement": "top_right"}`
 
-1. User performs base action.
-2. User issues correction shortly after (default: 90s).
-3. Learner maps correction to a `RuleValue` (for example `window_state=fullscreen`).
-4. Learner updates candidate evidence:
-   - positive evidence for explicit correction patterns
-   - negative evidence for opposite corrections against auto-applied rules
-5. Candidate status transitions:
-   - `candidate` -> `active` when thresholds pass
-   - `active` -> `blocked` after enough negatives
+## Matching and precedence
 
-## Promotion and confidence
+Active candidates are matched against the current `PlannedAction` and ranked by:
 
-Configured in `memory/constants.py`:
+1. context specificity
+2. entity specificity
+3. confidence
+4. recency
+5. candidate id tie-break
 
-- promotion positive threshold: `2`
-- promotion margin threshold: `2`
-- disable negative threshold: `2`
-- correction window: `90s`
+That allows broad group rules plus specific overrides. A rule keyed by `widget_id=speed_history` beats a broader `widget_group=small_graph` rule.
 
-Confidence formula:
+## Prompt rendering
 
-- `confidence = positive_count / (positive_count + negative_count + 1)`
+Active rules are rendered into a single global system-prompt snippet. Wording is derived from evidence strength:
 
-## Runtime policy selection
+- strong: `always` / `never`
+- medium: `consistently`
+- lower active confidence: `usually`
 
-`PolicyEngine` evaluates active rules and keeps only matching keys. It ranks matches by:
-
-1. context specificity (`len(rule_key.context)`)
-2. entity specificity (`len(rule_key.entities)`)
-3. confidence (higher wins)
-4. last reinforcement recency (`last_seen`)
-5. candidate id as deterministic tie-breaker
-
-Winner provides `desired_state`, which runtime applies as end-state operations.
+Rules below the inclusion threshold are omitted from the prompt.
 
 ## Explainability
 
-`runtime.explain_last_action()` returns:
+`PreferenceMemoryService.explain_last_match()` returns:
 
-- matched rule key/value
-- confidence and evidence counts
-- source episode ids
-- considered/applied rule ids
-- per-request trace from `EventLogger`
+- the rendered snippet
+- matched candidate ids
+- matched rules with confidence and evidence counts

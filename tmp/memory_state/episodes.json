@@ -2,32 +2,7 @@
   {
     "actions_executed": [
       {
-        "entity": {},
-        "handle": null,
-        "op": "unknown",
-        "success": false
-      }
-    ],
-    "applied_rule_hashes": [],
-    "auto_desired_state": {},
-    "considered_rule_hashes": [],
-    "context_signature": {
-      "display_count_bucket": "1",
-      "workspace_mode": "default"
-    },
-    "episode_id": "13dc0b84de434eb8b20fabdcbe8bfdb2",
-    "linked_episode_id": null,
-    "outcome": "failure",
-    "parsed_entities": {},
-    "parsed_intent": "unknown",
-    "target_role": "primary_window",
-    "timestamp": 1772456524.30331,
-    "user_utterance": "reset"
-  },
-  {
-    "actions_executed": [
-      {
-        "entity": "program_x",
+        "entity": "programx",
         "handle": "app_inst_1",
         "op": "open_app",
         "success": true
@@ -40,26 +15,19 @@
       "display_count_bucket": "1",
       "workspace_mode": "default"
     },
-    "episode_id": "cb9e2a47b73a40b1afb2b26eeec191a3",
+    "episode_id": "05a43576e88345b687db57f2e37aec64",
     "linked_episode_id": null,
     "outcome": "success",
     "parsed_entities": {
-      "app": "program_x"
+      "app": "programx"
     },
     "parsed_intent": "open_app",
     "target_role": "primary_window",
-    "timestamp": 1772456540.711641,
-    "user_utterance": "open program Program x"
+    "timestamp": 1772457597.686474,
+    "user_utterance": "open program ProgramX"
   },
   {
-    "actions_executed": [
-      {
-        "op": "set_window_state",
-        "success": true,
-        "ui_object": "win_2",
-        "value": "fullscreen"
-      }
-    ],
+    "actions_executed": [],
     "applied_rule_hashes": [],
     "auto_desired_state": {},
     "considered_rule_hashes": [],
@@ -67,21 +35,21 @@
       "display_count_bucket": "1",
       "workspace_mode": "default"
     },
-    "episode_id": "fe10ea32f9074fccafce8d6b408c745d",
-    "linked_episode_id": "cb9e2a47b73a40b1afb2b26eeec191a3",
-    "outcome": "success",
+    "episode_id": "728cd929192248a491b168f924104a44",
+    "linked_episode_id": null,
+    "outcome": "failure",
     "parsed_entities": {
       "window_state": "fullscreen"
     },
     "parsed_intent": "set_window_state",
     "target_role": "primary_window",
-    "timestamp": 1772456552.9255412,
+    "timestamp": 1772457744.6607456,
     "user_utterance": "make it fullscreen"
   },
   {
     "actions_executed": [
       {
-        "entity": "program_y",
+        "entity": "programx",
         "handle": "app_inst_3",
         "op": "open_app",
         "success": true
@@ -94,16 +62,16 @@
       "display_count_bucket": "1",
       "workspace_mode": "default"
     },
-    "episode_id": "4b41bb55cef946ae8c985b599c9cff4a",
+    "episode_id": "c56e3191fe7849bebd1de83786a2664b",
     "linked_episode_id": null,
     "outcome": "success",
     "parsed_entities": {
-      "app": "program_y"
+      "app": "programx"
     },
     "parsed_intent": "open_app",
     "target_role": "primary_window",
-    "timestamp": 1772456571.2733126,
-    "user_utterance": "open program Program Y"
+    "timestamp": 1772457771.6777487,
+    "user_utterance": "open program ProgramX"
   },
   {
     "actions_executed": [
@@ -121,21 +89,21 @@
       "display_count_bucket": "1",
       "workspace_mode": "default"
     },
-    "episode_id": "e689c188d9c14877be5b7c4bc665d9f8",
-    "linked_episode_id": "4b41bb55cef946ae8c985b599c9cff4a",
+    "episode_id": "8697d0c112cb4ec690361122055025ae",
+    "linked_episode_id": "c56e3191fe7849bebd1de83786a2664b",
     "outcome": "success",
     "parsed_entities": {
       "window_state": "fullscreen"
     },
     "parsed_intent": "set_window_state",
     "target_role": "primary_window",
-    "timestamp": 1772456579.3556328,
+    "timestamp": 1772457786.5081491,
     "user_utterance": "make it fullscreen"
   },
   {
     "actions_executed": [
       {
-        "entity": "programm_z",
+        "entity": "programx",
         "handle": "app_inst_5",
         "op": "open_app",
         "success": true
@@ -148,16 +116,16 @@
       "display_count_bucket": "1",
       "workspace_mode": "default"
     },
-    "episode_id": "13d1d725200b4c78ae791d586323f043",
+    "episode_id": "2293354e09904ea69aa480ac6e97135e",
     "linked_episode_id": null,
     "outcome": "success",
     "parsed_entities": {
-      "app": "programm_z"
+      "app": "programx"
     },
     "parsed_intent": "open_app",
     "target_role": "primary_window",
-    "timestamp": 1772456591.7855487,
-    "user_utterance": "open program Programm Z"
+    "timestamp": 1772457805.417896,
+    "user_utterance": "open program ProgramX"
   },
   {
     "actions_executed": [
@@ -175,43 +143,55 @@
       "display_count_bucket": "1",
       "workspace_mode": "default"
     },
-    "episode_id": "0fa7d4fa6d164ab9a4c1ddff8184f6a5",
-    "linked_episode_id": "13d1d725200b4c78ae791d586323f043",
+    "episode_id": "c84c0191dee540b587dfb1e7f0464e5c",
+    "linked_episode_id": "2293354e09904ea69aa480ac6e97135e",
     "outcome": "success",
     "parsed_entities": {
       "window_state": "fullscreen"
     },
     "parsed_intent": "set_window_state",
     "target_role": "primary_window",
-    "timestamp": 1772456613.263697,
+    "timestamp": 1772457813.4749053,
     "user_utterance": "make it fullscreen"
   },
   {
     "actions_executed": [
       {
-        "entity": "program_a",
+        "entity": "programx",
         "handle": "app_inst_7",
         "op": "open_app",
         "success": true
+      },
+      {
+        "op": "set_window_state",
+        "success": true,
+        "ui_object": "win_8",
+        "value": "fullscreen"
       }
     ],
-    "applied_rule_hashes": [],
-    "auto_desired_state": {},
-    "considered_rule_hashes": [],
+    "applied_rule_hashes": [
+      "46e76bbd9d38fcd663bd59c03e19dedadf0740e81bde82c8924f48fad3042f35"
+    ],
+    "auto_desired_state": {
+      "window_state": "fullscreen"
+    },
+    "considered_rule_hashes": [
+      "46e76bbd9d38fcd663bd59c03e19dedadf0740e81bde82c8924f48fad3042f35"
+    ],
     "context_signature": {
       "display_count_bucket": "1",
       "workspace_mode": "default"
     },
-    "episode_id": "d10c476ae9b243e884fc82da89640e85",
+    "episode_id": "cd35b94b9b7d4f21b7eb72b41b75ea08",
     "linked_episode_id": null,
     "outcome": "success",
     "parsed_entities": {
-      "app": "program_a"
+      "app": "programx"
     },
     "parsed_intent": "open_app",
     "target_role": "primary_window",
-    "timestamp": 1772456629.445285,
-    "user_utterance": "open program Program A"
+    "timestamp": 1772457828.5882854,
+    "user_utterance": "open program ProgramX"
   },
   {
     "actions_executed": [
@@ -229,22 +209,22 @@
       "display_count_bucket": "1",
       "workspace_mode": "default"
     },
-    "episode_id": "77f2d71653e14050a799279bfc1a6216",
+    "episode_id": "01cecdfbc3b741f697945d0aff5348fe",
     "linked_episode_id": null,
     "outcome": "failure",
     "parsed_entities": {},
     "parsed_intent": "unknown",
     "target_role": "primary_window",
-    "timestamp": 1772456660.1434531,
-    "user_utterance": "open programm Program X"
+    "timestamp": 1772457988.437411,
+    "user_utterance": "no, make it widget sized"
   },
   {
     "actions_executed": [
       {
-        "op": "set_window_state",
-        "success": true,
-        "ui_object": "win_8",
-        "value": "fullscreen"
+        "entity": {},
+        "handle": null,
+        "op": "unknown",
+        "success": false
       }
     ],
     "applied_rule_hashes": [],
@@ -254,21 +234,44 @@
       "display_count_bucket": "1",
       "workspace_mode": "default"
     },
-    "episode_id": "b39a33b992a242eab1adeec6a201b46c",
-    "linked_episode_id": "d10c476ae9b243e884fc82da89640e85",
-    "outcome": "success",
-    "parsed_entities": {
-      "window_state": "fullscreen"
-    },
-    "parsed_intent": "set_window_state",
+    "episode_id": "1db8b6657d234ae8a8cff7be0c788b0f",
+    "linked_episode_id": null,
+    "outcome": "failure",
+    "parsed_entities": {},
+    "parsed_intent": "unknown",
     "target_role": "primary_window",
-    "timestamp": 1772456665.9516835,
-    "user_utterance": "make it fullscreen"
+    "timestamp": 1772458007.2549255,
+    "user_utterance": "make it big again"
   },
   {
     "actions_executed": [
       {
-        "entity": "program_x",
+        "entity": {},
+        "handle": null,
+        "op": "unknown",
+        "success": false
+      }
+    ],
+    "applied_rule_hashes": [],
+    "auto_desired_state": {},
+    "considered_rule_hashes": [],
+    "context_signature": {
+      "display_count_bucket": "1",
+      "workspace_mode": "default"
+    },
+    "episode_id": "50f72bfbdc114e2ab1bb272a30730ae2",
+    "linked_episode_id": null,
+    "outcome": "failure",
+    "parsed_entities": {},
+    "parsed_intent": "unknown",
+    "target_role": "primary_window",
+    "timestamp": 1772458011.497506,
+    "user_utterance": "make it big again"
+  },
+  {
+    "actions_executed": [
+      {
+        "entity": "hi",
         "handle": "app_inst_9",
         "op": "open_app",
         "success": true
@@ -281,16 +284,16 @@
       "display_count_bucket": "1",
       "workspace_mode": "default"
     },
-    "episode_id": "c0f2bc03eac24b2f87ef93dd14ba48f7",
+    "episode_id": "7672ec43c0ea45b5b5c58cd22e9a3d41",
     "linked_episode_id": null,
     "outcome": "success",
     "parsed_entities": {
-      "app": "program_x"
+      "app": "hi"
     },
     "parsed_intent": "open_app",
     "target_role": "primary_window",
-    "timestamp": 1772456698.0528555,
-    "user_utterance": "open program Program X"
+    "timestamp": 1772458040.9599204,
+    "user_utterance": "open program hi"
   },
   {
     "actions_executed": [
@@ -308,21 +311,75 @@
       "display_count_bucket": "1",
       "workspace_mode": "default"
     },
-    "episode_id": "4d6079b77da442248c192a7ec144b9a9",
-    "linked_episode_id": "c0f2bc03eac24b2f87ef93dd14ba48f7",
+    "episode_id": "6557d4c590e64e0eb0b104ff4fccb03d",
+    "linked_episode_id": "7672ec43c0ea45b5b5c58cd22e9a3d41",
     "outcome": "success",
     "parsed_entities": {
       "window_state": "fullscreen"
     },
     "parsed_intent": "set_window_state",
     "target_role": "primary_window",
-    "timestamp": 1772456702.515906,
+    "timestamp": 1772458046.2445078,
     "user_utterance": "make it fullscreen"
   },
   {
     "actions_executed": [
       {
-        "entity": "program_x",
+        "op": "set_window_state",
+        "success": true,
+        "ui_object": "win_10",
+        "value": "fullscreen"
+      }
+    ],
+    "applied_rule_hashes": [],
+    "auto_desired_state": {},
+    "considered_rule_hashes": [],
+    "context_signature": {
+      "display_count_bucket": "1",
+      "workspace_mode": "default"
+    },
+    "episode_id": "34198d3c1fb74cc0bc7ce140e3af43cc",
+    "linked_episode_id": "7672ec43c0ea45b5b5c58cd22e9a3d41",
+    "outcome": "success",
+    "parsed_entities": {
+      "window_state": "fullscreen"
+    },
+    "parsed_intent": "set_window_state",
+    "target_role": "primary_window",
+    "timestamp": 1772458052.9819627,
+    "user_utterance": "make it fullscreen"
+  },
+  {
+    "actions_executed": [
+      {
+        "op": "set_window_state",
+        "success": true,
+        "ui_object": "win_10",
+        "value": "fullscreen"
+      }
+    ],
+    "applied_rule_hashes": [],
+    "auto_desired_state": {},
+    "considered_rule_hashes": [],
+    "context_signature": {
+      "display_count_bucket": "1",
+      "workspace_mode": "default"
+    },
+    "episode_id": "e98935fdac514218855b5197debb673a",
+    "linked_episode_id": "7672ec43c0ea45b5b5c58cd22e9a3d41",
+    "outcome": "success",
+    "parsed_entities": {
+      "window_state": "fullscreen"
+    },
+    "parsed_intent": "set_window_state",
+    "target_role": "primary_window",
+    "timestamp": 1772458057.0590906,
+    "user_utterance": "make it fullscreen"
+  },
+  {
+    "actions_executed": [
+      {
+        "entity": "hi",
         "handle": "app_inst_11",
         "op": "open_app",
         "success": true
@@ -335,27 +392,27 @@
       }
     ],
     "applied_rule_hashes": [
-      "7a154d9f6a5222e18c25c9f67c937cdbd4dab9e9eb19a982be9de9b07353f70f"
+      "6d1ebfcc9a2b29072e7ef2dea263b97da621384abf40067477d451776ffe8dfa"
     ],
     "auto_desired_state": {
       "window_state": "fullscreen"
     },
     "considered_rule_hashes": [
-      "7a154d9f6a5222e18c25c9f67c937cdbd4dab9e9eb19a982be9de9b07353f70f"
+      "6d1ebfcc9a2b29072e7ef2dea263b97da621384abf40067477d451776ffe8dfa"
     ],
     "context_signature": {
       "display_count_bucket": "1",
       "workspace_mode": "default"
     },
-    "episode_id": "b1aee78b8efd4e85856fa4346c88d2cd",
+    "episode_id": "5edbbdd174a54377a6b6b0da7b389045",
     "linked_episode_id": null,
     "outcome": "success",
     "parsed_entities": {
-      "app": "program_x"
+      "app": "hi"
     },
     "parsed_intent": "open_app",
     "target_role": "primary_window",
-    "timestamp": 1772456748.7833781,
-    "user_utterance": "open program Program X"
+    "timestamp": 1772458062.2410753,
+    "user_utterance": "open program hi"
   }
 ]

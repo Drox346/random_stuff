@@ -1,18 +1,17 @@
-"""Interactive CLI for testing preference memory in real time."""
+"""Interactive CLI for structured planned-action testing."""
 
 from __future__ import annotations
 
 import argparse
 import json
-import shlex
 import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .models import normalize_identifier
-from .runtime import PreferenceMemoryRuntime
+from .models import CorrectionRecord, PlannedAction, normalize_identifier
+from .service import PreferenceMemoryService
 
 
 def parse_key_value_assignments(items: list[str]) -> dict[str, str]:
@@ -44,6 +43,22 @@ def normalize_context_updates(assignments: dict[str, str]) -> dict[str, Any]:
     return updates
 
 
+def parse_json_payload(payload: str) -> dict[str, Any]:
+    parsed = json.loads(payload)
+    if not isinstance(parsed, dict):
+        raise ValueError("Expected a JSON object payload")
+    return parsed
+
+
+def coerce_planned_action(payload: dict[str, Any], timestamp: float) -> PlannedAction:
+    action_payload = dict(payload)
+    action_payload.setdefault("timestamp", timestamp)
+    action_payload.setdefault("entities", {})
+    action_payload.setdefault("action", {})
+    action_payload.setdefault("context", {})
+    return PlannedAction.from_dict(action_payload)
+
+
 @dataclass(slots=True)
 class ClockState:
     mode: str
@@ -62,12 +77,12 @@ class ClockState:
 class InteractiveMemoryCLI:
     def __init__(
         self,
-        runtime: PreferenceMemoryRuntime,
+        service: PreferenceMemoryService,
         *,
         context: dict[str, Any],
         clock: ClockState,
     ):
-        self.runtime = runtime
+        self.service = service
         self.context = dict(context)
         self.clock = clock
 
@@ -75,29 +90,24 @@ class InteractiveMemoryCLI:
         self._print_banner()
         while True:
             try:
-                prompt = self._prompt()
-                line = input(prompt).strip()
+                line = input(self._prompt()).strip()
             except (EOFError, KeyboardInterrupt):
                 print("\nExiting.")
                 return
 
             if not line:
                 continue
-
-            if line.startswith(":"):
-                should_exit = self._handle_command(line[1:].strip())
-                if should_exit:
-                    return
+            if not line.startswith(":"):
+                print("Use commands starting with ':' . Use :help for syntax.")
                 continue
 
-            self._handle_utterance(line)
+            should_exit = self._handle_command(line[1:].strip())
+            if should_exit:
+                return
 
     def _prompt(self) -> str:
         mode = "R" if self.clock.mode == "real" else "V"
-        if self.clock.mode == "virtual":
-            tinfo = f" t={self.clock.virtual_now:.1f}"
-        else:
-            tinfo = ""
+        tinfo = f" t={self.clock.virtual_now:.1f}" if self.clock.mode == "virtual" else ""
         return (
             f"[{mode} display={self.context.get('display_count')} "
             f"workspace={self.context.get('workspace_mode')}{tinfo}] > "
@@ -105,52 +115,16 @@ class InteractiveMemoryCLI:
 
     def _print_banner(self) -> None:
         print("Preference Memory Interactive CLI")
-        print("Type utterances directly, or use commands starting with ':'.")
+        print("Submit structured JSON payloads with commands starting with ':'.")
         print("Use ':help' for available commands.")
 
-    def _handle_utterance(self, utterance: str) -> None:
-        timestamp = self.clock.consume_timestamp()
-        result = self.runtime.process_utterance(
-            utterance,
-            runtime_context=self.context,
-            timestamp=timestamp,
-        )
-
-        print(
-            f"[{result['outcome']}] intent={result['intent']} "
-            f"episode={result['episode_id'][:8]}"
-        )
-        if result.get("policy"):
-            policy = result["policy"]
-            applied = policy.get("applied_rule_hashes", [])
-            desired = policy.get("desired_state", {})
-            print(f"policy.applied={applied}")
-            if desired:
-                print(f"policy.desired_state={desired}")
-
-        if result.get("linked_episode_id"):
-            print(f"linked_episode_id={result['linked_episode_id']}")
-        if result.get("learning_updates"):
-            print(f"learning_updates={result['learning_updates']}")
-
-        ui_object = result.get("ui_object")
-        if ui_object:
-            snapshot = self._inspect_ui_object(ui_object)
-            if snapshot:
-                print(f"ui_object={ui_object} snapshot={snapshot}")
-
     def _handle_command(self, command_line: str) -> bool:
-        try:
-            parts = shlex.split(command_line)
-        except ValueError as exc:
-            print(f"Command parse error: {exc}")
+        if not command_line:
             return False
 
-        if not parts:
-            return False
-
-        command = parts[0].lower()
-        args = parts[1:]
+        command, _, remainder = command_line.partition(" ")
+        command = command.lower().strip()
+        remainder = remainder.strip()
 
         try:
             if command in {"quit", "exit", "q"}:
@@ -160,25 +134,31 @@ class InteractiveMemoryCLI:
                 self._print_help()
                 return False
             if command == "context":
-                self._command_context(args)
+                self._command_context(remainder.split() if remainder else [])
                 return False
             if command == "time":
-                self._command_time(args)
+                self._command_time(remainder.split() if remainder else [])
+                return False
+            if command == "attempt":
+                self._command_attempt(remainder)
+                return False
+            if command == "correct":
+                self._command_correct(remainder)
+                return False
+            if command == "snippet":
+                self._command_snippet(remainder)
+                return False
+            if command == "rules":
+                self._command_rules(remainder.split() if remainder else [])
+                return False
+            if command == "episodes":
+                self._command_episodes(remainder.split() if remainder else [])
                 return False
             if command == "explain":
                 self._command_explain()
                 return False
-            if command == "rules":
-                self._command_rules(args)
-                return False
-            if command == "episodes":
-                self._command_episodes(args)
-                return False
-            if command == "inspect":
-                self._command_inspect(args)
-                return False
             if command == "reset":
-                self.runtime.reset()
+                self.service.reset()
                 print("Store reset: episodes and candidates cleared.")
                 return False
 
@@ -193,8 +173,7 @@ class InteractiveMemoryCLI:
             print(f"context={self.context}")
             return
 
-        assignments = parse_key_value_assignments(args)
-        updates = normalize_context_updates(assignments)
+        updates = normalize_context_updates(parse_key_value_assignments(args))
         self.context.update(updates)
         print(f"updated context={self.context}")
 
@@ -238,13 +217,39 @@ class InteractiveMemoryCLI:
 
         raise ValueError("Usage: :time [show|get|mode|set|step|tick]")
 
-    def _command_explain(self) -> None:
-        print(json.dumps(self.runtime.explain_last_action(), indent=2, sort_keys=True))
+    def _command_attempt(self, remainder: str) -> None:
+        if not remainder:
+            raise ValueError("Usage: :attempt <json object>")
+        timestamp = self.clock.consume_timestamp()
+        action = self._merge_context(coerce_planned_action(parse_json_payload(remainder), timestamp))
+        result = self.service.record_attempt(action)
+        print(f"attempt.episode={result['episode_id'][:8]}")
+        print(f"attempt.matched_rule_hashes={result['matched_rule_hashes']}")
+        if result["snippet_text"]:
+            print(result["snippet_text"])
+
+    def _command_correct(self, remainder: str) -> None:
+        if not remainder:
+            raise ValueError("Usage: :correct <json object>")
+        timestamp = self.clock.consume_timestamp()
+        payload = parse_json_payload(remainder)
+        original = self._merge_context(coerce_planned_action(dict(payload["original"]), timestamp))
+        corrected = self._merge_context(coerce_planned_action(dict(payload["corrected"]), timestamp))
+        correction = CorrectionRecord(original=original, corrected=corrected, timestamp=timestamp)
+        result = self.service.record_correction(correction)
+        print(f"correction.episode={result['episode_id'][:8]}")
+        print(f"linked_episode_id={result['linked_episode_id']}")
+        print(f"learning_updates={result['learning_updates']}")
+
+    def _command_snippet(self, remainder: str) -> None:
+        if remainder:
+            raise ValueError("Usage: :snippet")
+        snippet = self.service.build_prompt_snippet()
+        print(snippet or "[no matching learned preferences]")
 
     def _command_rules(self, args: list[str]) -> None:
         status_filter = args[0].lower() if args else "active"
-        candidates = self.runtime.store.list_candidates()
-
+        candidates = self.service.store.list_candidates()
         if status_filter != "all":
             candidates = [candidate for candidate in candidates if candidate.status == status_filter]
 
@@ -254,19 +259,17 @@ class InteractiveMemoryCLI:
 
         print(f"rules({status_filter}) count={len(candidates)}")
         for candidate in candidates:
-            key = candidate.rule_key.canonical_dict()
-            value = candidate.rule_value.to_desired_state()
             print(
                 f"- id={candidate.candidate_id[:10]} status={candidate.status} "
                 f"p={candidate.positive_count} n={candidate.negative_count} "
                 f"conf={candidate.confidence:.3f} last_seen={candidate.last_seen:.1f}"
             )
-            print(f"  key={key}")
-            print(f"  value={value}")
+            print(f"  key={candidate.rule_key.canonical_dict()}")
+            print(f"  value={candidate.rule_value.to_preferences()}")
 
     def _command_episodes(self, args: list[str]) -> None:
         limit = int(args[0]) if args else 10
-        episodes = self.runtime.store.list_episodes()
+        episodes = self.service.store.list_episodes()
         if not episodes:
             print("No episodes.")
             return
@@ -276,30 +279,33 @@ class InteractiveMemoryCLI:
         for episode in subset:
             print(
                 f"- ts={episode.timestamp:.1f} id={episode.episode_id[:8]} "
-                f"intent={episode.parsed_intent} outcome={episode.outcome} "
+                f"type={episode.episode_type} outcome={episode.outcome} "
                 f"linked={episode.linked_episode_id}"
             )
-            if episode.applied_rule_hashes:
-                print(f"  applied={episode.applied_rule_hashes}")
+            if episode.matched_rule_hashes:
+                print(f"  matched={episode.matched_rule_hashes}")
 
-    def _command_inspect(self, args: list[str]) -> None:
-        if len(args) != 1:
-            raise ValueError("Usage: :inspect <ui_object>")
-        object_id = args[0]
-        snapshot = self._inspect_ui_object(object_id)
-        if not snapshot:
-            print(f"No snapshot available for '{object_id}'.")
-            return
-        print(json.dumps(snapshot, indent=2, sort_keys=True))
+    def _command_explain(self) -> None:
+        print(json.dumps(self.service.explain_last_match(), indent=2, sort_keys=True))
 
-    def _inspect_ui_object(self, object_id: str) -> dict[str, Any] | None:
-        inspector = getattr(self.runtime.adapter, "get_object_snapshot", None)
-        if inspector is None:
-            return None
-        snapshot = inspector(object_id)
-        if not snapshot:
-            return None
-        return snapshot
+    def _merge_context(self, action: PlannedAction) -> PlannedAction:
+        merged_context = dict(action.context)
+        merged_context.update(
+            normalize_context_updates(
+                {
+                    "display_count": str(self.context["display_count"]),
+                    "workspace_mode": str(self.context["workspace_mode"]),
+                }
+            )
+        )
+        return PlannedAction(
+            intent=action.intent,
+            entities=action.entities,
+            action=action.action,
+            context=merged_context,
+            timestamp=action.timestamp,
+            role=action.role,
+        )
 
     def _print_help(self) -> None:
         print(
@@ -313,54 +319,46 @@ class InteractiveMemoryCLI:
             "  :time set <float>             Set virtual clock value\n"
             "  :time step <float>            Set virtual auto-step\n"
             "  :time tick <float>            Advance virtual clock manually\n"
+            "  :attempt <json>               Record a planned action\n"
+            "  :correct <json>               Record original/corrected planned actions\n"
+            "  :snippet                      Render prompt snippet from all active rules\n"
             "  :rules [active|candidate|blocked|all]  List rules\n"
             "  :episodes [N]                 Show last N episodes (default 10)\n"
-            "  :inspect <ui_object>          Show mock UI object snapshot\n"
-            "  :explain                      Explain last action\n"
+            "  :explain                      Explain last snippet match\n"
             "  :reset                        Clear persisted episodes and rules\n"
-            "\n"
-            "Input any non-command line as a user utterance.\n"
         )
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Interactive CLI for memory runtime")
+    parser = argparse.ArgumentParser(description="Interactive CLI for memory service")
     parser.add_argument("--data-dir", type=str, default=None, help="Path for episodes/candidates JSON files")
     parser.add_argument("--fresh", action="store_true", help="Reset store at startup")
     parser.add_argument("--display-count", type=int, default=1, help="Initial display count context")
     parser.add_argument("--workspace-mode", type=str, default="default", help="Initial workspace mode context")
-    parser.add_argument(
-        "--time-mode",
-        choices=("virtual", "real"),
-        default="virtual",
-        help="Timestamp mode for requests",
-    )
+    parser.add_argument("--time-mode", choices=("virtual", "real"), default="virtual", help="Timestamp mode for requests")
     parser.add_argument("--time-start", type=float, default=1000.0, help="Initial virtual time")
-    parser.add_argument("--time-step", type=float, default=5.0, help="Virtual time step after each utterance")
+    parser.add_argument("--time-step", type=float, default=5.0, help="Virtual time step after each command")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
-
     context = normalize_context_updates(
         {
             "display_count": str(args.display_count),
             "workspace_mode": args.workspace_mode,
         }
     )
-
-    runtime = PreferenceMemoryRuntime(data_dir=Path(args.data_dir) if args.data_dir else None)
+    service = PreferenceMemoryService(data_dir=Path(args.data_dir) if args.data_dir else None)
     if args.fresh:
-        runtime.reset()
+        service.reset()
 
-    cli = InteractiveMemoryCLI(
-        runtime,
+    InteractiveMemoryCLI(
+        service,
         context=context,
         clock=ClockState(mode=args.time_mode, virtual_now=args.time_start, virtual_step=args.time_step),
-    )
-    cli.run()
+    ).run()
     return 0
 
 

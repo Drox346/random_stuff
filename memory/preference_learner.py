@@ -1,12 +1,10 @@
-"""Learns and updates preference candidates from user corrections."""
+"""Learns and updates preference candidates from structured correction records."""
 
 from __future__ import annotations
 
 from typing import Any
 
 from .constants import (
-    BASE_INTENTS,
-    CORRECTION_INTENTS,
     CORRECTION_WINDOW_SECONDS,
     DISABLE_NEGATIVE_THRESHOLD,
     PROMOTION_MARGIN_THRESHOLD,
@@ -14,11 +12,13 @@ from .constants import (
 )
 from .memory_store import MemoryStore
 from .models import (
+    CorrectionRecord,
     Episode,
+    PlannedAction,
     PreferenceCandidate,
     RuleKey,
     RuleValue,
-    SemanticParse,
+    canonicalize_action,
     canonicalize_context,
     canonicalize_entities,
     compute_candidate_id,
@@ -34,19 +34,22 @@ class PreferenceLearner:
         self.store = store
         self.correction_window_seconds = correction_window_seconds
 
-    def is_correction(self, parse: SemanticParse) -> bool:
-        return parse.intent in CORRECTION_INTENTS
-
-    def link_correction_episode(self, correction: SemanticParse) -> Episode | None:
+    def link_correction_episode(self, correction: CorrectionRecord) -> Episode | None:
         episodes = self.store.list_episodes()
+        original = correction.original.canonical_dict()
+        original_without_timestamp = dict(original)
+        original_without_timestamp.pop("timestamp", None)
         compatible: list[Episode] = []
-
         for episode in episodes:
-            if episode.parsed_intent not in BASE_INTENTS:
+            if episode.episode_type != "attempt":
                 continue
             if episode.outcome != "success":
                 continue
-            if episode.target_role != correction.role:
+            if not episode.planned_action:
+                continue
+            planned_without_timestamp = dict(episode.planned_action)
+            planned_without_timestamp.pop("timestamp", None)
+            if planned_without_timestamp != original_without_timestamp:
                 continue
             delta = correction.timestamp - episode.timestamp
             if delta < 0 or delta > self.correction_window_seconds:
@@ -57,79 +60,69 @@ class PreferenceLearner:
             return None
         return max(compatible, key=lambda episode: episode.timestamp)
 
-    def correction_to_rule_value(self, correction: SemanticParse) -> RuleValue:
-        entities = correction.entities
-        if correction.intent == "set_window_state":
-            return RuleValue(window_state=entities.get("window_state"))
-        if correction.intent == "set_display":
-            return RuleValue(display=entities.get("display"))
-        if correction.intent == "set_size_preset":
-            return RuleValue(size_preset=entities.get("size_preset"))
-        if correction.intent == "set_dock_region":
-            return RuleValue(dock_region=entities.get("dock_region"))
-        if correction.intent == "set_visibility":
-            return RuleValue(visibility=entities.get("visibility"))
-        if correction.intent == "set_always_on_top":
-            return RuleValue(always_on_top=entities.get("always_on_top") == "true")
-        return RuleValue()
-
-    def rule_key_from_episode(self, episode: Episode) -> RuleKey:
+    def rule_key_from_action(self, planned_action: PlannedAction) -> RuleKey:
         return RuleKey(
-            intent=episode.parsed_intent,
-            entities=canonicalize_entities(episode.parsed_entities),
-            role=episode.target_role,
-            context=canonicalize_context(episode.context_signature),
+            intent=planned_action.intent,
+            entities=canonicalize_entities(planned_action.entities),
+            role=planned_action.role,
+            context=canonicalize_context(planned_action.context),
         )
 
     def record_correction(
         self,
-        target_episode: Episode,
-        correction: SemanticParse,
-        success: bool,
+        correction: CorrectionRecord,
         correction_episode_id: str,
+        matching_active_candidates: list[PreferenceCandidate],
+        linked_episode_id: str | None,
     ) -> dict[str, Any]:
-        if not success:
+        changes = self.diff_actions(correction.original, correction.corrected)
+        if not changes:
             return {"updated_candidates": [], "negative_updates": []}
 
-        rule_key = self.rule_key_from_episode(target_episode)
-        rule_value = self.correction_to_rule_value(correction)
-        desired = rule_value.to_desired_state()
-        if not desired:
-            return {"updated_candidates": [], "negative_updates": []}
-
+        rule_key = self.rule_key_from_action(correction.original)
+        positive_updates: list[str] = []
         negative_updates: list[str] = []
-        had_opposite_auto_rule = False
-        for applied_candidate_id in target_episode.applied_rule_hashes:
-            applied_candidate = self.store.get_candidate_by_id(applied_candidate_id)
-            if not applied_candidate:
-                continue
-            if not self._is_opposite(applied_candidate.rule_value, rule_value):
-                continue
-            had_opposite_auto_rule = True
-            applied_candidate.negative_count += 1
-            applied_candidate.last_seen = correction.timestamp
-            self._append_sources(applied_candidate, [target_episode.episode_id, correction_episode_id])
-            self._recompute_status(applied_candidate)
-            self.store.upsert_candidate(applied_candidate)
-            negative_updates.append(applied_candidate.candidate_id)
 
-        if had_opposite_auto_rule:
-            return {
-                "updated_candidates": [],
-                "negative_updates": negative_updates,
-            }
+        for action_key, corrected_value in changes.items():
+            rule_value = RuleValue(preferences={action_key: corrected_value})
+            positive_candidate = self._get_or_create_candidate(rule_key, rule_value)
+            positive_candidate.positive_count += 1
+            positive_candidate.last_seen = correction.timestamp
+            self._append_sources(positive_candidate, [linked_episode_id, correction_episode_id])
+            self._recompute_status(positive_candidate)
+            self.store.upsert_candidate(positive_candidate)
+            positive_updates.append(positive_candidate.candidate_id)
 
-        positive_candidate = self._get_or_create_candidate(rule_key, rule_value)
-        positive_candidate.positive_count += 1
-        positive_candidate.last_seen = correction.timestamp
-        self._append_sources(positive_candidate, [target_episode.episode_id, correction_episode_id])
-        self._recompute_status(positive_candidate)
-        self.store.upsert_candidate(positive_candidate)
+            for candidate in matching_active_candidates:
+                candidate_preferences = candidate.rule_value.to_preferences()
+                if action_key not in candidate_preferences:
+                    continue
+                if candidate_preferences[action_key] == corrected_value:
+                    continue
+                candidate.negative_count += 1
+                candidate.last_seen = correction.timestamp
+                self._append_sources(candidate, [linked_episode_id, correction_episode_id])
+                self._recompute_status(candidate)
+                self.store.upsert_candidate(candidate)
+                negative_updates.append(candidate.candidate_id)
 
         return {
-            "updated_candidates": [positive_candidate.candidate_id],
+            "updated_candidates": positive_updates,
             "negative_updates": negative_updates,
         }
+
+    def diff_actions(
+        self,
+        original: PlannedAction,
+        corrected: PlannedAction,
+    ) -> dict[str, Any]:
+        original_action = canonicalize_action(original.action)
+        corrected_action = canonicalize_action(corrected.action)
+        changes: dict[str, Any] = {}
+        for key, value in corrected_action.items():
+            if original_action.get(key) != value:
+                changes[key] = value
+        return changes
 
     def _get_or_create_candidate(self, rule_key: RuleKey, rule_value: RuleValue) -> PreferenceCandidate:
         rule_key_hash = rule_key.hash()
@@ -172,14 +165,3 @@ class PreferenceLearner:
             return
 
         candidate.status = "candidate"
-
-    def _is_opposite(self, existing_value: RuleValue, incoming_value: RuleValue) -> bool:
-        existing = existing_value.to_desired_state()
-        incoming = incoming_value.to_desired_state()
-
-        for key, incoming_state in incoming.items():
-            if key not in existing:
-                continue
-            if existing[key] != incoming_state:
-                return True
-        return False
