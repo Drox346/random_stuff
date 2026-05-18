@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llm-documents"
+version = "0.1.0"
+description = "Local Ollama proof of concept for office document workflows."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "docling>=2.40.0",
+    "docxtpl>=0.18.0",
+    "ollama>=0.6.1",
+    "openpyxl>=3.1.0",
+    "pypdf>=6.11.0",
+    "python-docx>=1.1.0",
+    "rich>=13.7.0",
+    "typer>=0.12.0",
+]
+
+[project.scripts]
+llm-documents = "llm_documents.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+llm_documents = ["assets/*.pdf"]
