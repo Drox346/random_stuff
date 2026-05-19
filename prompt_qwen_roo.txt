@@ -1,0 +1,92 @@
+apply_diff formatting override:
+
+For every apply_diff call, the diff must use this exact structure:
+
+<<<<<<< SEARCH
+:start_line:<number>
+-------
+<exact current file text>
+=======
+<replacement text>
+>>>>>>> REPLACE
+
+Rules:
+- `:start_line:<number>` must use a colon, never `=`.
+- `-------` must be alone on its own line.
+- Never write code on the same line as `-------`.
+- `=======` and `>>>>>>> REPLACE` must also be alone on their own lines.
+- SEARCH text must be copied exactly from the current file, including whitespace.
+- Do not wrap tool arguments in Markdown fences.
+- Do not add explanations inside the diff.
+
+If apply_diff fails:
+1. Re-read the file.
+2. Retry once with a smaller exact SEARCH block.
+3. If it fails again, stop using apply_diff for that edit and use write_to_file only if the complete file can be preserved correctly.
+
+Never repeat a failed apply_diff unchanged.
+
+
+
+
+
+
+
+
+
+Additional constraints for apply_diff usage:
+
+When using apply_diff, the diff body must exactly follow Roo Code’s expected SEARCH/REPLACE format. Do not improvise or “clean up” the syntax.
+
+Required format:
+
+<<<<<<< SEARCH
+:start_line:<LINE_NUMBER>
+-------
+<EXACT_TEXT_FROM_FILE>
+=======
+<REPLACEMENT_TEXT>
+>>>>>>> REPLACE
+
+Strict syntax requirements:
+
+- The start line marker must be exactly `:start_line:<number>`.
+- Never use `:start_line=<number>`, `:start_line <number>`, `:start_line: <number>`, or any other variant.
+- The separator must be exactly `-------`.
+- The `-------` separator must be alone on its own line.
+- Never attach source code to the separator line.
+- The `=======` separator must be alone on its own line.
+- The `>>>>>>> REPLACE` marker must be alone on its own line.
+- Do not wrap the diff in Markdown code fences.
+- Do not include commentary inside the diff argument.
+
+Before calling apply_diff, silently check:
+
+1. The SEARCH text is copied exactly from the current file contents.
+2. The SEARCH text preserves exact whitespace and indentation.
+3. The SEARCH text is specific enough to identify one location.
+4. The `:start_line:` line uses colon syntax, not equals or any other punctuation.
+5. The line after `:start_line:<number>` is exactly `-------`.
+6. No source code appears on the same line as `-------`.
+
+If apply_diff fails:
+
+- Do not retry the same diff.
+- Re-read the target file or inspect the relevant region.
+- Compare the SEARCH block against the actual file contents.
+- Retry at most once with a smaller, exact SEARCH block.
+- If the second attempt fails, stop using apply_diff for that edit and use a safer edit method such as write_to_file, provided the full file can be preserved accurately.
+
+Common failure patterns to avoid:
+
+- `:start_line=18`
+- `:start_line: 18`
+- `-------import ...`
+- `-------const ...`
+- `-------function ...`
+- SEARCH text based on an earlier version of the file
+- large multi-hunk diffs when a small localized diff would work
+
+Prefer smaller apply_diff patches over large ones. If the edit touches multiple unrelated regions, make separate small edits rather than one fragile diff.
+
+When context is long or uncertain, be more conservative: inspect before editing, use smaller SEARCH blocks, and switch away from apply_diff after repeated failure.
