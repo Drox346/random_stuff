@@ -1,4 +1,10 @@
 #include <iostream>
+#include <vector>
+#include <regex>
+#include <string>
+#include <exception>
+#include <thread>
+#include <cstring>
 using namespace std;
 
 string separator = "\n---------------------------------------------------------------------------------\n";
@@ -49,6 +55,75 @@ public:
     int GetCurrentCount() const { return _current; }
     const T1& GetElement1(int index) const { return _elements1[index]; }
     const T2& GetElement2(int index) const { return _elements2[index]; }
+    T2& GetElement2(int index) { return _elements2[index]; }
+
+    T1& operator[](int index) {
+        return _elements1[index];
+    }
+
+    Collection RemoveDuplicates() {
+        Collection newCollection;
+
+        for (int i = 0; i < _current; i++) {
+            bool exists = false;
+
+            for (int j = 0; j < newCollection.GetCurrentCount(); j++) {
+                if (_elements1[i] == newCollection.GetElement1(j) &&
+                    _elements2[i] == newCollection.GetElement2(j)) {
+                    exists = true;
+                    break;
+                }
+            }
+
+            if (!exists) {
+                newCollection.Add(_elements1[i], _elements2[i]);
+            }
+        }
+
+        return newCollection;
+    }
+
+    Collection(const Collection& other) {
+        _elements1 = new T1[max];
+        _elements2 = new T2[max];
+
+        for (int i = 0; i < other._current; i++) {
+            _elements1[i] = other._elements1[i];
+            _elements2[i] = other._elements2[i];
+        }
+
+        _current = other._current;
+    }
+
+    Collection& operator=(const Collection& other) {
+        if (this != &other) {
+            delete[] _elements1;
+            delete[] _elements2;
+
+            _elements1 = new T1[max];
+            _elements2 = new T2[max];
+
+            for (int i = 0; i < other._current; i++) {
+                _elements1[i] = other._elements1[i];
+                _elements2[i] = other._elements2[i];
+            }
+
+            _current = other._current;
+        }
+
+        return *this;
+    }
+
+    void Add(const T1& first, const T2& second) {
+        if (_current >= max) {
+            return;
+        }
+
+        _elements1[_current] = first;
+        _elements2[_current] = second;
+
+        _current++;
+    }
 
     friend ostream& operator<<(ostream& COUT, const Collection& obj) {
         for (int i = 0; i < obj.GetCurrentCount(); i++)
@@ -64,6 +139,20 @@ public:
     }
 };
 
+string Format(int number) {
+    string result = "";
+
+    if (number < 10) {
+        result += "0";
+        result += to_string(number);
+    }
+    else {
+        result += to_string(number);
+    }
+
+    return result;
+}
+
 class DateTime {
     int* _day, * _month, * _year, * _hours, * _minutes;
 public:
@@ -75,6 +164,84 @@ public:
         _hours = new int(hours);
         _minutes = new int(minutes);
     }
+
+    DateTime(const DateTime& other) {
+        _day = new int(*other._day);
+        _month = new int(*other._month);
+        _year = new int(*other._year);
+        _hours = new int(*other._hours);
+        _minutes = new int(*other._minutes);
+    }
+
+    DateTime& operator=(const DateTime& other) {
+        if (this != &other) {
+            delete _day;
+            delete _month;
+            delete _year;
+            delete _hours;
+            delete _minutes;
+
+            _day = new int(*other._day);
+            _month = new int(*other._month);
+            _year = new int(*other._year);
+            _hours = new int(*other._hours);
+            _minutes = new int(*other._minutes);
+        }
+        return *this;
+    }
+
+    bool operator>(const DateTime& other) const {
+        if (*_year != *other._year) {
+            return *_year > *other._year;
+        }
+        if (*_month != *other._month) {
+            return *_month > *other._month;
+        }
+        if (*_day != *other._day) {
+            return *_day > *other._day;
+        }
+        if (*_hours != *other._hours) {
+            return *_hours > *other._hours;
+        }
+
+        return *_minutes > *other._minutes;
+    }
+
+    bool operator==(const DateTime& other) const {
+        if (*_year == *other._year &&
+            *_month == *other._month &&
+            *_day == *other._day &&
+            *_hours == *other._hours &&
+            *_minutes == *other._minutes) {
+            return true;
+        }
+        return false;
+    }
+
+    string ToString() const {
+        string result = "";
+
+        result += Format(*_day);
+
+        result += ".";
+
+        result += Format(*_month);
+
+        result += ".";
+
+        result += to_string(*_year);
+
+        result += " ";
+
+        result += Format(*_hours);
+
+        result += ":";
+
+        result += Format(*_minutes);
+
+        return result;
+    }
+
     int GetYear() const { return *_year; }
     friend ostream& operator<<(ostream& COUT, const DateTime& obj) {
         // ToString returns the date and time in the format DD.MM.YYYY HH:MM
@@ -98,6 +265,31 @@ class Intervention {
     int _durationMinutes;
 public:
     const string& GetDescription() const { return _description; }
+
+    Intervention(const string& description, const string& technician, double price, int duration) {
+        _description = description;
+        _technician = technician;
+        _price = price;
+        _durationMinutes = duration;
+    }
+
+    string ToString() const {
+        string result = "";
+        
+        result += _description;
+        result += " | ";
+        result += _technician;
+        result += " | ";
+        string price_str = to_string(_price);
+        price_str.erase(price_str.length() - 4);
+        result += price_str;
+        result += " | ";
+        result += to_string(_durationMinutes);
+        result += " min";
+
+        return result;
+    }
+
     const string& GetTechnician() const { return _technician; }
     double GetPrice() const { return _price; }
     int GetDurationMinutes() const { return _durationMinutes; }
@@ -117,6 +309,27 @@ class Client {
     string _email;
     string _phone;
 public:
+    Client(const string& fullName, const string& email, const string& phone) {
+        _fullName = fullName;
+        _email = email;
+        _phone = phone;
+    }
+
+    Client(const Client& other) {
+        _fullName = other._fullName;
+        _email = other._email;
+        _phone = other._phone;
+    }
+
+    Client& operator=(const Client& other) {
+        if (this != &other) {
+            _fullName = other._fullName;
+            _email = other._email;
+            _phone = other._phone;
+        }
+        return *this;
+    }
+
     const string& GetFullName() const { return _fullName; }
     const string& GetEmail() const { return _email; }
     const string& GetPhone() const { return _phone; }
@@ -127,6 +340,42 @@ public:
     }
 };
 
+string GenerateLabel(const char* fullName, int serialNumber, int year) {
+    if (serialNumber < 1 || serialNumber > 999 || year < 2000 || year > 2099) {
+        return "SRV-000/XX-0000";
+    }
+
+    string result = "SRV-";
+    if (serialNumber < 10) {
+        result += "00";
+        result += to_string(serialNumber);
+    }
+    else if (serialNumber < 100) {
+        result += "0";
+        result += to_string(serialNumber);
+    }
+    else {
+        result += to_string(serialNumber);
+    }
+
+    result += "/";
+
+    int lastSpace = -1;
+    for (int i = 0; i < strlen(fullName); i++) {
+        if (fullName[i] == ' ') {
+            lastSpace = i;
+        }
+    }
+
+    result += fullName[0];
+    result += fullName[lastSpace + 1];
+
+    result += "-";
+    result += to_string(year);
+
+    return result;
+}
+
 class ServiceRequest {
     char* _label;
     char* _device;
@@ -136,6 +385,100 @@ class ServiceRequest {
     Collection<RequestStatus, DateTime, 10> _statuses;
     vector<Intervention> _interventions;
 public:
+    ServiceRequest(const char* device, const char* faultDescription, const Client& client, int serialNumber, DateTime time) : _client(client) {
+        _device = AllocateText(device);
+        _faultDescription = AllocateText(faultDescription);
+        _serialNumber = serialNumber;
+        string generatedLabel = GenerateLabel(_client.GetFullName().c_str(), serialNumber, time.GetYear());
+        _label = AllocateText(generatedLabel.c_str());
+        _statuses.Add(RECEIVED, time);
+    }
+
+    ServiceRequest(const ServiceRequest& other) : _client(other._client) {
+        _device = AllocateText(other._device);
+        _faultDescription = AllocateText(other._faultDescription);
+        _serialNumber = other._serialNumber;
+        _label = AllocateText(other._label);
+        _statuses = other._statuses;
+        _interventions = other._interventions;
+    }
+
+    ServiceRequest& operator=(const ServiceRequest& other) {
+        if (this != &other) {
+            delete[] _device;
+            delete[] _faultDescription;
+            delete[] _label;
+
+            _device = AllocateText(other._device);
+            _faultDescription = AllocateText(other._faultDescription);
+            _serialNumber = other._serialNumber;
+            _label = AllocateText(other._label);
+            _statuses = other._statuses;
+            _interventions = other._interventions;
+            _client = other._client;
+        }
+
+        return *this;
+    }
+
+    bool AddIntervention(const Intervention& inspection) {
+        if ((GetCurrentStatus() != DIAGNOSTICS && GetCurrentStatus() != REPAIR) ||
+            inspection.GetPrice() < 0 || inspection.GetDurationMinutes() < 0) {
+            return false;
+        }
+
+        _interventions.push_back(inspection);
+        return true;
+    }
+
+    double TotalPrice() const {
+        double sum = 0;
+        for(int i = 0; i < _interventions.size(); i++) {
+            sum += _interventions[i].GetPrice();
+        }
+        return sum;
+    }
+
+    int TotalDuration() const {
+        int sum = 0;
+        for (int i = 0; i < _interventions.size(); i++) {
+            sum += _interventions[i].GetDurationMinutes();
+        }
+        return sum;
+    }
+
+    bool AddStatus(RequestStatus status, const DateTime& time) {
+        RequestStatus current = GetCurrentStatus();
+
+        if (current == COMPLETED) {
+            return false;
+        }
+
+        if (current + 1 != status) {
+            return false;
+        }
+
+        if (!(time > GetCurrentTime())) {
+            return false;
+        }
+
+        _statuses.Add(status, time);
+        return true;
+    }
+
+    string ToString() const {
+        string result = "";
+        result += _label;
+        result += " | ";
+        result += _client.GetFullName();
+        result += " | ";
+        result += _device;
+        result += " | ";
+        result += RequestStatusNames[GetCurrentStatus()];
+
+        return result;
+    }
+
     const char* GetLabel() const { return _label; }
     const char* GetDevice() const { return _device; }
     const char* GetFaultDescription() const { return _faultDescription; }
@@ -147,6 +490,7 @@ public:
     vector<Intervention>& GetInterventions() { return _interventions; }
     const vector<Intervention>& GetInterventions() const { return _interventions; }
     RequestStatus GetCurrentStatus() const { return _statuses.GetElement1(_statuses.GetCurrentCount() - 1); }
+    DateTime GetCurrentTime() const { return _statuses.GetElement2(_statuses.GetCurrentCount() - 1); }
     friend ostream& operator<<(ostream& COUT, const ServiceRequest& obj) {
         // ToString returns:
         // label | client full name | device | current status
@@ -168,6 +512,97 @@ public:
     Service(const char* name = "") {
         _name = AllocateText(name);
     }
+
+    Service(const Service& other) {
+        _name = AllocateText(other._name);
+        _requests = other._requests;
+    }
+
+    Service& operator=(const Service& other) {
+        if (this != &other) {
+            delete[] _name;
+            _name = AllocateText(other._name);
+            _requests = other._requests;
+        }
+        return *this;
+    }
+
+    void AddRequest(const ServiceRequest& request) {
+        for (int i = 0; i < _requests.size(); i++) {
+            if (request.GetSerialNumber() == _requests[i].GetSerialNumber() ||
+                strcmp(request.GetLabel(), _requests[i].GetLabel()) == 0) {
+                throw exception("Serial number or label must not be the same");
+            }
+        }
+        _requests.push_back(request);
+    }
+
+    ServiceRequest* FindRequest(const string& label) {
+        for (int i = 0; i < _requests.size(); i++) {
+            if (strcmp(label.c_str(), _requests[i].GetLabel()) == 0) {
+                return &_requests[i];
+            }
+        }
+        return nullptr;
+    }
+
+    bool RecordStatus(const string& label, RequestStatus status, const DateTime& time) {
+        ServiceRequest* request = FindRequest(label);
+
+        if (request == nullptr) {
+            return false;
+        }
+
+        if (!request->AddStatus(status, time)) {
+            return false;
+        }
+
+        if (status == COMPLETED) {
+            thread t([request]() {
+                cout << separator;
+                cout << "To: " << request->GetClient().GetEmail() << endl;
+                cout << "From: racuni@servis.ba" << endl;
+                cout << "Subject: Service request completed - invoice" << endl << endl;
+
+                cout << "Dear " << request->GetClient().GetFullName() << "," << endl << endl;
+
+                cout << "Service request " << request->GetLabel()
+                    << " for device " << request->GetDevice()
+                    << " has been completed." << endl;
+
+                cout << "Total amount: " << request->TotalPrice() << " KM" << endl << endl;
+
+                cout << "Thank you for your trust." << endl;
+                cout << separator;
+                });
+
+            t.join();
+        }
+        return true;
+    }
+
+    vector<ServiceRequest*> ExtractUnfinished() {
+        vector<ServiceRequest*> unfinished;
+        for (int i = 0; i < _requests.size(); i++) {
+            if (_requests[i].GetCurrentStatus() != COMPLETED) {
+                unfinished.push_back(&_requests[i]);
+            }
+        }
+        return unfinished;
+    }
+
+    double CalculateRevenue() const {
+        double sum = 0;
+
+        for (int i = 0; i < _requests.size(); i++) {
+            if (_requests[i].GetCurrentStatus() == COMPLETED) {
+                sum += _requests[i].TotalPrice();
+            }
+        }
+
+        return sum;
+    }
+
     const char* GetName() const { return _name; }
     vector<ServiceRequest>& GetRequests() { return _requests; }
     const vector<ServiceRequest>& GetRequests() const { return _requests; }
@@ -184,6 +619,12 @@ const char* GetAnswerToFirstQuestion() {
 const char* GetAnswerToSecondQuestion() {
     cout << "Question -> Explain how, using the covered classes and methods, you could determine the size of a text file.\n";
     return "Answer -> ENTER YOUR ANSWER HERE";
+}
+
+bool ValidateLabel(const string& label) {
+    regex rule("^SRV-(?!000)[0-9]{3}/[A-Z]{2}-20[0-9]{2}$");
+
+    return regex_match(label, rule);
 }
 
 int main() {
