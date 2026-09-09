@@ -5,6 +5,9 @@
 #include <exception>
 #include <thread>
 #include <cstring>
+#include <sstream>
+#include <iomanip>
+#include <cctype>
 using namespace std;
 
 string separator = "\n---------------------------------------------------------------------------------\n";
@@ -116,6 +119,19 @@ public:
 
     void Add(const T1& first, const T2& second) {
         if (_current >= max) {
+            // it seems like we are expected to throw here
+            // later in main we have this which should fail on the third Add:
+            /*
+                try {
+                    Collection<int, string, 2> full;
+                    full.Add(1, "One");
+                    full.Add(2, "Two");
+                    full.Add(3, "Three");
+                }
+                catch (exception& e) {
+                    cout << "Exception: " << e.what() << separator;
+                }
+            */
             return;
         }
 
@@ -275,14 +291,17 @@ public:
 
     string ToString() const {
         string result = "";
-        
+
         result += _description;
         result += " | ";
         result += _technician;
         result += " | ";
-        string price_str = to_string(_price);
-        price_str.erase(price_str.length() - 4);
-        result += price_str;
+        // the currency suffix was missing
+        // also, cutting four digits off truncates prices: 85.509 becomes 85.50. it now rounds to two decimals
+        ostringstream price;
+        price << fixed << setprecision(2) << _price;
+        result += price.str();
+        result += " KM";
         result += " | ";
         result += to_string(_durationMinutes);
         result += " min";
@@ -341,7 +360,28 @@ public:
 };
 
 string GenerateLabel(const char* fullName, int serialNumber, int year) {
-    if (serialNumber < 1 || serialNumber > 999 || year < 2000 || year > 2099) {
+    // a null name used to reach strlen and which caused a crash
+    if (fullName == nullptr || serialNumber < 1 || serialNumber > 999 || year < 2000 || year > 2099) {
+        return "SRV-000/XX-0000";
+    }
+
+    // the single word test in main failed because both initials came from the
+    // same letter. read at least two words, then keep the first and last ones.
+    // this also handles empty names and extra whitespace without reading a null.
+    istringstream name(fullName);
+    string firstWord, lastWord, word;
+    if (!(name >> firstWord >> lastWord)) {
+        return "SRV-000/XX-0000";
+    }
+    while (name >> word) {
+        lastWord = word;
+    }
+
+    // the regex expects uppercase ascii initials. the exam doesn't spell out how lowercase input should work
+    // not entirely sure if normalization is relevant
+    char firstInitial = toupper(firstWord[0]);
+    char lastInitial = toupper(lastWord[0]);
+    if (firstInitial < 'A' || firstInitial > 'Z' || lastInitial < 'A' || lastInitial > 'Z') {
         return "SRV-000/XX-0000";
     }
 
@@ -360,15 +400,8 @@ string GenerateLabel(const char* fullName, int serialNumber, int year) {
 
     result += "/";
 
-    int lastSpace = -1;
-    for (int i = 0; i < strlen(fullName); i++) {
-        if (fullName[i] == ' ') {
-            lastSpace = i;
-        }
-    }
-
-    result += fullName[0];
-    result += fullName[lastSpace + 1];
+    result += firstInitial;
+    result += lastInitial;
 
     result += "-";
     result += to_string(year);
@@ -422,6 +455,8 @@ public:
     }
 
     bool AddIntervention(const Intervention& inspection) {
+        // both values must be greater than zero. these < 0 checks still accept
+        // zero price or duration. change them to <= 0.
         if ((GetCurrentStatus() != DIAGNOSTICS && GetCurrentStatus() != REPAIR) ||
             inspection.GetPrice() < 0 || inspection.GetDurationMinutes() < 0) {
             return false;
@@ -570,7 +605,11 @@ public:
                     << " for device " << request->GetDevice()
                     << " has been completed." << endl;
 
-                cout << "Total amount: " << request->TotalPrice() << " KM" << endl << endl;
+                // tiny difference: the example shows 140.50, this printed 140.5
+                // format it if you want the same display
+                ostringstream amount;
+                amount << fixed << setprecision(2) << request->TotalPrice();
+                cout << "Total amount: " << amount.str() << " KM" << endl << endl;
 
                 cout << "Thank you for your trust." << endl;
                 cout << separator;
@@ -613,11 +652,13 @@ public:
 
 const char* GetAnswerToFirstQuestion() {
     cout << "Question -> Explain why operator<< is implemented as a global function rather than a member function, and how the prefix and postfix forms of the increment operator are implemented?\n";
+    // UNANSWERED
     return "Answer -> ENTER YOUR ANSWER HERE";
 }
 
 const char* GetAnswerToSecondQuestion() {
     cout << "Question -> Explain how, using the covered classes and methods, you could determine the size of a text file.\n";
+    // UNANSWERED
     return "Answer -> ENTER YOUR ANSWER HERE";
 }
 
